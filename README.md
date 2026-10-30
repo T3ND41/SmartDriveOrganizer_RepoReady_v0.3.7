@@ -1,4 +1,4 @@
-# Smart Drive Organizer — v0.5.0
+# Smart Drive Organizer — v0.6.0
 
 **Safe deep search, recurring-pattern discovery, reviewable grouping and persistent rules**
 
@@ -39,6 +39,33 @@ The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, 
 To protect Windows, installed applications and development environments, the scanner deliberately skips Windows and recovery directories, Boot/EFI areas, Program Files, ProgramData, AppData, recycle-bin/system-volume folders, protected operating-system files, project roots and common package/dependency/cache folders. It also avoids following symbolic links, junctions and other reparse points. Inaccessible folders are reported as warnings rather than forced open. Network locations are not selected automatically.
 
 This is an intentionally safe deep search of accessible personal/work files on the selected volumes, **not a byte-for-byte search of every protected operating-system location**. Some user data stored inside excluded locations such as AppData will therefore not appear. No scan can promise access to every file on a machine, because permissions, encryption, offline drives and damaged media can prevent access.
+
+## Local full-text search, learning memory and duplicate intelligence (v0.6.0)
+
+### Google-style search dashboard
+- Added a central local search screen for filenames and extracted document text, with filters for original location, file family, extension, topic, modified-date range and file-size range.
+- Results can open the original file or reveal it in its original folder.
+- **Build / refresh index** recursively indexes selected drives/folders. The main scan also refreshes index records for files it processes.
+- Metadata and bounded extracted text are stored in a local SQLite database under `%LOCALAPPDATA%\\SmartDriveOrganizer\\file_search.sqlite3` (Windows). No file contents are uploaded to a server.
+
+### Full-text formats and limits
+- Extracts text from PDF text layers, DOCX, XLSX/XLSM, PPTX, plain text, CSV/TSV, HTML/XML, RTF, source-code text, EML email and Outlook MSG email.
+- Outlook MSG extraction uses the optional `extract-msg` parser, included in the Windows build.
+- Document extraction is bounded to protect memory and scan time. Very large or encrypted files, damaged documents and formats without a supported parser may be indexed by name/metadata only.
+- Legacy binary Office files (`.doc`, `.xls`, `.ppt`) are listed and searchable by filename/metadata, but their internal text is not currently extracted. Image-only/scanned PDFs require OCR, which is not part of this release.
+
+### Adaptive local memory
+- Approved discovery groups, rejected suggestions and filing corrections are saved in `learning_memory.json` on this device.
+- Rejected filename patterns are suppressed in later discovery scans; approving a previously rejected pattern removes its rejection.
+- Rename a discovered group before approval to store the preferred folder name.
+- Select a proposed file in the organization preview and choose **Teach selected file** to save a topic/keyword correction for future scans.
+- **Learning memory** in the navigation lets you inspect remembered approvals, rejections and filing corrections, and remove a rejection so it can be suggested again.
+- Saved classifier/topic rules are separate from the memory history and remain editable through the existing rule manager.
+
+### Duplicate and version review
+- **Find duplicates & versions** in the search dashboard checks indexed files for exact SHA-256 duplicates, likely filename revisions/copies and very high text overlap between supported documents.
+- Findings show the files and why they were grouped. Similarity and version grouping are heuristic suggestions; inspect the documents before deciding what to keep.
+- This tool is inspection-only. It does not delete, overwrite, merge, rename or move duplicates.
 
 ## Features
 
@@ -86,7 +113,7 @@ Run tests with `python -m unittest discover -s tests -v`.
 
 ## CI and Windows releases
 
-Pushes to `main` run tests on Windows and Linux. Pushing a version tag such as `v0.5.0` runs the Windows release workflow, which tests the project, builds the executable, packages it, calculates SHA-256 and publishes a GitHub Release.
+Pushes to `main` run tests on Windows and Linux. Pushing a version tag such as `v0.6.0` runs the Windows release workflow, which tests the project, builds the executable, packages it, calculates SHA-256 and publishes a GitHub Release.
 
 ## Safety
 
