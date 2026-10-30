@@ -17,6 +17,7 @@ from .content_reader import read_document_text
 from .file_types import extension_is_selected, load_extension_filters, normalize_extension_filters
 from .models import PlannedFile, ScanPlan
 from .operations import _copy_verified, _unique_path, run_plan
+from .search_index import sync_file_operation
 from .scanner import (
     PROTECTED_DIRECTORY_NAMES,
     PROTECTED_FILE_EXTENSIONS,
@@ -661,6 +662,20 @@ class AutomationEngine:
                     status = str(result.get("status", "failed"))
                     self._record_result(source, status, json.dumps(result, ensure_ascii=False))
                     processed += 1 if status in {"copied", "moved", "copied_source_kept"} else 0
+                    if status in {"copied", "moved", "copied_source_kept"} and result.get("destination"):
+                        try:
+                            sync_file_operation(
+                                Path(result.get("source", source)),
+                                Path(result["destination"]),
+                                str(result.get("category", category_for(source))),
+                                str(result.get("topic", "")),
+                                remove_source=(status == "moved"),
+                            )
+                        except Exception as index_error:
+                            # Search indexing must never mark an already-completed
+                            # copy/move as failed or attempt to reverse the file action.
+                            warnings += 1
+                            self.last_message = f"File organized, but the local search index could not be updated: {index_error}"
                     if status == "failed":
                         warnings += 1
                 except Exception as error:
