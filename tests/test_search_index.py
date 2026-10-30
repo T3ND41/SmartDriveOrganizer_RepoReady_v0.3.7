@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from smart_drive_organizer.search_index import SearchIndex, build_index
+from smart_drive_organizer.classifier import save_custom_rules
 
 
 class SearchIndexTests(unittest.TestCase):
@@ -63,6 +65,28 @@ class SearchIndexTests(unittest.TestCase):
             self.assertEqual(len(index.search(query="replacement valve")), 1)
             self.assertEqual(len(index.search(query="Project_001")), 1)
             index.close()
+
+
+    def test_index_builder_saves_classifier_topic_for_dashboard_topic_filter(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            source.mkdir()
+            item = source / "Supplier Quotation 2026.txt"
+            item.write_text("supplier quotation", encoding="utf-8")
+            app_data = root / "appdata"
+            app_data.mkdir()
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(app_data)}):
+                save_custom_rules(app_data / "SmartDriveOrganizer" / "keyword_rules.json", [
+                    {"name": "Quotations", "keywords": ["quotation"], "category": "Documents"}
+                ])
+                database = root / "index.sqlite3"
+                build_index([source], ["Documents"], database=database)
+                index = SearchIndex(database)
+                rows = index.search(query="supplier", topic="Quotations")
+                index.close()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["topic"], "Quotations")
 
 
 if __name__ == "__main__":
