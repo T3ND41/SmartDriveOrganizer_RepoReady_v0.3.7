@@ -26,6 +26,7 @@ from .github_publish_ui import GitHubPublishDialog
 from .file_types import FileTypeSelectionDialog, extension_filter_summary, load_extension_filters, save_extension_filters
 from .learning import record_discovery_decisions, record_filing_correction, memory_summary
 from .search_dashboard import SearchDashboardDialog
+from .memory_ui import LearningMemoryDialog
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
@@ -152,6 +153,7 @@ class OrganizerApp(tk.Tk):
         nav_button("File formats", lambda: self._scroll_to_section("filetypes"))
         nav_button("Topic groups & rules", lambda: self._scroll_to_section("selective"))
         nav_button("Search all files", self._open_search_dashboard, accent=True)
+        nav_button("Learning memory", self._open_learning_memory)
         nav_button("Automation settings", self._open_automation_settings)
         nav_button("Activity log", self._open_activity_log)
         nav_button("GitHub publishing", self._open_github_publisher)
@@ -316,6 +318,9 @@ class OrganizerApp(tk.Tk):
 
     def _open_search_dashboard(self) -> None:
         SearchDashboardDialog(self, CATEGORIES)
+
+    def _open_learning_memory(self) -> None:
+        LearningMemoryDialog(self)
 
     def _preview_selection_changed(self, _event=None) -> None:
         enabled = bool(self.plan and self.table.selection() and not self.busy)
