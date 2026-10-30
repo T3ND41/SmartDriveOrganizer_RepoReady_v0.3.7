@@ -48,11 +48,16 @@ def _tokens(stem: str) -> list[tuple[str, str]]:
 def discover_repeated_groups(candidates: Iterable[tuple[Path, str]],
                               custom_rules: Optional[list] = None,
                               topic_rules: Optional[list] = None,
-                              min_files: int = 2, max_groups: int = 60) -> list[DiscoveryGroup]:
+                              min_files: int = 2, max_groups: int = 60,
+                              ignored_patterns: Optional[list[dict]] = None) -> list[DiscoveryGroup]:
     """Count repeated filename patterns across distinct scanned files, read-only."""
     min_files = max(2, min_files)
     known = _known(custom_rules, topic_rules)
     known_single_terms = {word for phrase in known for word in phrase.split()}
+    ignored = {
+        (str(item.get("category", "Any")).casefold(), normalize_text(str(item.get("phrase", ""))))
+        for item in (ignored_patterns or []) if isinstance(item, dict)
+    }
     # Keep only counts and up to five examples per pattern. Avoid a path set for
     # every phrase, which would consume excessive memory on large drives.
     counts: dict[tuple[str, str], dict] = {}
@@ -70,7 +75,9 @@ def discover_repeated_groups(candidates: Iterable[tuple[Path, str]],
             for i in range(max(0, len(words) - size + 1)):
                 part = words[i:i + size]
                 phrase = " ".join(w[0] for w in part)
-                if not phrase or phrase in known or (size == 1 and phrase in known_single_terms):
+                if (not phrase or phrase in known or (size == 1 and phrase in known_single_terms)
+                        or (category.casefold(), phrase) in ignored
+                        or ("any", phrase) in ignored):
                     continue
                 keys[phrase] = [w[1] for w in part]
         for phrase, display in keys.items():
