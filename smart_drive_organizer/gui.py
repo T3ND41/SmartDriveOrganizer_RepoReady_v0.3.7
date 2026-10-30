@@ -579,43 +579,46 @@ class OrganizerApp(tk.Tk):
             self._approve_discovered_groups(dialog.result)
 
     def _approve_discovered_groups(self, groups: list[dict]) -> None:
-        """Persist only user-approved patterns, then rescan to build a fresh preview."""
+        """Persist approved patterns as reusable classifier rules, then rescan."""
         try:
+            # Save to the general classifier as well as the selective-topic
+            # list so accepted discoveries remain useful when the user changes
+            # modes later. The automatic monitor reads these same local rules.
+            custom_rules = load_custom_rules(rules_file())
+            for group in groups:
+                name = str(group["name"]).strip()
+                phrase = str(group["phrase"]).strip()
+                category = str(group["category"])
+                existing = next((rule for rule in custom_rules
+                                 if str(rule.get("name", "")).casefold() == name.casefold()
+                                 and str(rule.get("category", "Any")) == category), None)
+                if existing:
+                    existing["keywords"] = list(dict.fromkeys(existing.get("keywords", []) + [phrase]))
+                else:
+                    custom_rules.append({"name": name, "keywords": [phrase], "category": category})
+            save_custom_rules(rules_file(), custom_rules)
+
             if self.topic_filter_var.get():
-                rules = load_topic_rules(topic_rules_file())
+                topic_rules = load_topic_rules(topic_rules_file())
                 for group in groups:
                     name = str(group["name"]).strip()
                     phrase = str(group["phrase"]).strip()
                     category = str(group["category"])
-                    existing = next((rule for rule in rules if rule.get("name", "").casefold() == name.casefold()), None)
+                    existing = next((rule for rule in topic_rules
+                                     if str(rule.get("name", "")).casefold() == name.casefold()), None)
                     if existing:
-                        existing["keywords"] = list(dict.fromkeys(list(existing.get("keywords", [])) + [phrase]))
+                        existing["keywords"] = list(dict.fromkeys(existing.get("keywords", []) + [phrase]))
                         scopes = list(existing.get("categories", ["Any"]))
                         existing["categories"] = ["Any"] if "Any" in scopes else list(dict.fromkeys(scopes + [category]))
                     else:
-                        rules.append({"name": name, "keywords": [phrase], "categories": [category], "match_mode": "whole_phrase"})
-                save_topic_rules(topic_rules_file(), rules)
+                        topic_rules.append({"name": name, "keywords": [phrase], "categories": [category], "match_mode": "whole_phrase"})
+                save_topic_rules(topic_rules_file(), topic_rules)
                 self.topic_rules = load_topic_rules(topic_rules_file())
                 self._refresh_topic_options()
                 for group in groups:
                     name = str(group["name"])
-                    if name not in self.topic_vars:
-                        self.topic_vars[name] = tk.BooleanVar(value=True)
-                    self.topic_vars[name].set(True)
-            else:
-                rules = load_custom_rules(rules_file())
-                for group in groups:
-                    name = str(group["name"]).strip()
-                    phrase = str(group["phrase"]).strip()
-                    category = str(group["category"])
-                    existing = next((rule for rule in rules
-                                     if str(rule.get("name", "")).casefold() == name.casefold()
-                                     and str(rule.get("category", "Any")) == category), None)
-                    if existing:
-                        existing["keywords"] = list(dict.fromkeys(existing.get("keywords", []) + [phrase]))
-                    else:
-                        rules.append({"name": name, "keywords": [phrase], "category": category})
-                save_custom_rules(rules_file(), rules)
+                    if name in self.topic_vars:
+                        self.topic_vars[name].set(True)
         except Exception as error:
             messagebox.showerror("Could not save discovered groups", str(error), parent=self)
             return
