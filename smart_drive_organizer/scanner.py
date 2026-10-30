@@ -8,6 +8,7 @@ from typing import Callable, Iterable, List, Optional, Set
 from .classifier import category_for, classify_selected_topic, classify_topic, extension_bucket, selected_topic_destination
 from .content_reader import read_document_text
 from .discovery import discover_repeated_groups
+from .learning import rejected_discovery_patterns
 from .file_types import extension_is_selected, normalize_extension_filters
 from .models import PlannedFile, ScanPlan
 
@@ -130,6 +131,12 @@ def scan_directory(
     normalized_extension_filters = normalize_extension_filters(extension_filters or {})
     plan = ScanPlan(source, output, sorted(selected), selected_extension_filters=normalized_extension_filters)
     rules = custom_rules or []
+    indexer = None
+    try:
+        from .search_index import SearchIndex
+        indexer = SearchIndex()
+    except (OSError, ValueError):
+        plan.warnings.append("The local search index could not be opened; this scan can still organize files, but it will not update full-text search.")
     route_destinations = _selected_route_destinations(selected_topics, topic_rules) if topic_filter_enabled else []
     for route_destination in route_destinations:
         _validate_route_destination(route_destination, source)
@@ -210,7 +217,9 @@ def scan_directory(
                 discovery_candidates.append((path, category))
                 size = path.stat().st_size
                 content = ""
-                if read_contents and category == "Documents" and size <= 20 * 1024 * 1024:
+                needs_index = bool(indexer and indexer.needs_refresh(path))
+                text_supported = category in {"Documents", "Code"} or path.suffix.casefold() in {".eml", ".msg"}
+                if read_contents and text_supported:
                     content = read_document_text(path)
                 if topic_filter_enabled:
                     selected_match = classify_selected_topic(path, category, content, selected_topics, rules, topic_rules)
@@ -219,6 +228,11 @@ def scan_directory(
                     topic, reason, confidence = selected_match
                 else:
                     topic, reason, confidence = classify_topic(path, category, content, rules)
+                if needs_index and indexer is not None:
+                    try:
+                        indexer.upsert_file(path, category, content, topic)
+                    except OSError as index_error:
+                        plan.warnings.append(f"Search index could not update {path.name}: {index_error}")
                 ext_folder = extension_bucket(path)
                 custom_destination = selected_topic_destination(topic, topic_rules) if topic_filter_enabled else None
                 destination = (custom_destination / path.name) if custom_destination else (output / category / topic / ext_folder / path.name)
@@ -240,7 +254,16 @@ def scan_directory(
             break
 
     plan.discovery_candidates = discovery_candidates
-    plan.discovery_groups = discover_repeated_groups(discovery_candidates, rules, topic_rules)
+    plan.discovery_groups = discover_repeated_groups(
+        discovery_candidates, rules, topic_rules,
+        ignored_patterns=rejected_discovery_patterns(),
+    )
+    if indexer is not None:
+        try:
+            indexer.db.commit()
+            indexer.close()
+        except Exception:
+            plan.warnings.append("The local search index could not be committed; the organization preview is still available.")
     report(
         f"Scan complete: {len(plan.files):,} files selected from {checked:,} files checked; "
         f"{len(plan.discovery_groups):,} recurring patterns discovered."
@@ -357,7 +380,8 @@ def scan_directories(
         unique_candidates[candidate_key] = (candidate_path, candidate_category)
     combined.discovery_candidates = list(unique_candidates.values())
     combined.discovery_groups = discover_repeated_groups(
-        combined.discovery_candidates, custom_rules, topic_rules
+        combined.discovery_candidates, custom_rules, topic_rules,
+        ignored_patterns=rejected_discovery_patterns(),
     )
 
     if not combined.files and failures:
