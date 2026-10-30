@@ -56,8 +56,13 @@ def discover_repeated_groups(candidates: Iterable[tuple[Path, str]],
     # Keep only counts and up to five examples per pattern. Avoid a path set for
     # every phrase, which would consume excessive memory on large drives.
     counts: dict[tuple[str, str], dict] = {}
+    seen_files: set[str] = set()
     for path, category in candidates:
         path = Path(path)
+        path_key = os.path.normcase(str(path))
+        if path_key in seen_files:
+            continue
+        seen_files.add(path_key)
         words = _tokens(path.stem)
         keys: dict[str, list[str]] = {}
         for size in (1, 2, 3):
@@ -67,7 +72,6 @@ def discover_repeated_groups(candidates: Iterable[tuple[Path, str]],
                 if not phrase or phrase in known or (size == 1 and phrase in known_single_terms):
                     continue
                 keys[phrase] = [w[1] for w in part]
-        path_key = os.path.normcase(str(path))
         for phrase, display in keys.items():
             row = counts.setdefault((category, phrase), {"count": 0, "display": display, "samples": [], "fingerprint": hashlib.sha256()})
             row["count"] += 1
