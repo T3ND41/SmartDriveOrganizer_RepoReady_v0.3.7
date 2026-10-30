@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-drive-organizer"
-version = "0.3.8"
+version = "0.4.0"
 description = "Local-first file organizer with optional automatic background monitoring"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,3 +18,6 @@ build = ["pyinstaller>=6.0.0"]
 
 [tool.setuptools.packages.find]
 include = ["smart_drive_organizer*"]
+
+[tool.setuptools.package-data]
+smart_drive_organizer = ["assets/*.png"]
