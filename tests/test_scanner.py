@@ -265,5 +265,36 @@ class ScannerTests(unittest.TestCase):
                 scan_directory(source, output_file, ["Documents"])
 
 
+    def test_discovers_unselected_repeated_patterns_even_in_selective_topic_mode(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "source"
+            root.mkdir()
+            (root / "LPO_2024.pdf").write_bytes(b"one")
+            (root / "LPO_2025.pdf").write_bytes(b"two")
+            plan = scan_directory(
+                root, Path(temp) / "output", ["Documents"], read_contents=False,
+                topic_filter_enabled=True, selected_topics=["Statements"],
+            )
+            self.assertEqual(plan.files, [])
+            self.assertTrue(any(group.phrase == "lpo" for group in plan.discovery_groups))
+
+    def test_safe_deep_scan_skips_operating_system_and_application_directories(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "drive"
+            (root / "Users" / "Person" / "Documents").mkdir(parents=True)
+            (root / "Windows" / "System32").mkdir(parents=True)
+            (root / "Program Files" / "Sample App").mkdir(parents=True)
+            (root / "ProgramData" / "Sample App").mkdir(parents=True)
+            (root / "AppData" / "Local" / "Sample App").mkdir(parents=True)
+            (root / "Users" / "Person" / "Documents" / "LPO_2024.pdf").write_bytes(b"user")
+            (root / "Windows" / "System32" / "LPO_system.pdf").write_bytes(b"system")
+            (root / "Program Files" / "Sample App" / "LPO_app.pdf").write_bytes(b"app")
+            (root / "ProgramData" / "Sample App" / "LPO_data.pdf").write_bytes(b"data")
+            (root / "AppData" / "Local" / "Sample App" / "LPO_cache.pdf").write_bytes(b"cache")
+            plan = scan_directory(root, Path(temp) / "output", ["Documents"], read_contents=False)
+            self.assertEqual({item.source.name for item in plan.files}, {"LPO_2024.pdf"})
+            self.assertEqual(len(plan.discovery_candidates), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
