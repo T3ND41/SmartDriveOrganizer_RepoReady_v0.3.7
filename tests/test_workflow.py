@@ -1,5 +1,11 @@
 from pathlib import Path
-from tempfile import TemporaryDirectory
+import tempfile
+
+# Keep test output fixtures inside the checkout, not protected Windows AppData.
+_TEST_TEMP_ROOT = Path(__file__).resolve().parents[1] / ".test-temp"
+_TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+tempfile.tempdir = str(_TEST_TEMP_ROOT)
+TemporaryDirectory = tempfile.TemporaryDirectory
 import unittest
 
 from smart_drive_organizer.operations import run_plan

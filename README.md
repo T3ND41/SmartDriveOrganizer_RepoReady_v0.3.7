@@ -1,4 +1,6 @@
-# Smart Drive Organizer — v0.3.7
+# Smart Drive Organizer — v0.3.8
+
+**Selectable file extensions for manual and automatic organization**
 
 A local-first Windows file organizer with custom keyword routing, multi-drive scanning, persistent rules and optional background monitoring.
 
@@ -16,6 +18,9 @@ The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, 
 
 ## Features
 
+- Choose exact extensions within Documents, Images, Videos, Audio, Archives, Code, Applications, Fonts, 3D Models and Others. Common formats are listed first, followed by specialist formats.
+- The same saved extension filters apply to manual scans and background monitoring; unselected extensions remain untouched.
+
 - Recursively scans selected folders and mounted drives.
 - Supports multiple source drives and one central output destination.
 - Custom topic rules with multiple keywords and partial/contains matching.
@@ -25,6 +30,10 @@ The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, 
 - Background monitoring of selected folders, with saved settings.
 - Selective organization: unmatched files remain untouched.
 - Optional GitHub publishing for approved rules and source changes.
+
+## Choose exact file extensions
+
+After selecting broad file families, click **Choose file formats…**. For each selected family, choose **All supported formats** or **Only the formats I select below**. The Documents common list starts with PDF, DOCX, XLSX, XLS, CSV, PPTX, DOC, TXT, PPT and RTF. Additional and specialist formats follow. Selections are saved locally and enforced before classification and organization in both manual and automatic modes.
 
 ## Run from source
 

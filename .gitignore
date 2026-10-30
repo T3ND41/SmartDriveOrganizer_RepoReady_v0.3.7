@@ -22,3 +22,5 @@ config/private_*.json
 release/
 *.zip
 *.sha256
+
+.test-temp/

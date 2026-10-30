@@ -7,6 +7,7 @@ from typing import Callable, Iterable, List, Optional, Set
 
 from .classifier import category_for, classify_selected_topic, classify_topic, extension_bucket, selected_topic_destination
 from .content_reader import read_document_text
+from .file_types import extension_is_selected, normalize_extension_filters
 from .models import PlannedFile, ScanPlan
 
 PROTECTED_DIRECTORY_NAMES = {
@@ -96,6 +97,7 @@ def scan_directory(
     topic_filter_enabled: bool = False,
     selected_topics: Optional[Iterable[str]] = None,
     topic_rules: Optional[list] = None,
+    extension_filters: Optional[dict[str, list[str]]] = None,
 ) -> ScanPlan:
     source = source_root.expanduser().resolve()
     output = output_root.expanduser().resolve()
@@ -122,7 +124,8 @@ def scan_directory(
     if _unsafe_output_overlap(source, output):
         raise ValueError("For safety, the output folder cannot be the same as or above the source folder. Choose a folder below the source or on another location.")
 
-    plan = ScanPlan(source, output, sorted(selected))
+    normalized_extension_filters = normalize_extension_filters(extension_filters or {})
+    plan = ScanPlan(source, output, sorted(selected), selected_extension_filters=normalized_extension_filters)
     rules = custom_rules or []
     route_destinations = _selected_route_destinations(selected_topics, topic_rules) if topic_filter_enabled else []
     for route_destination in route_destinations:
@@ -196,6 +199,8 @@ def scan_directory(
                 category = category_for(path)
                 if category not in selected:
                     continue
+                if not extension_is_selected(path, category, normalized_extension_filters):
+                    continue
                 size = path.stat().st_size
                 content = ""
                 if read_contents and category == "Documents" and size <= 20 * 1024 * 1024:
@@ -242,6 +247,7 @@ def scan_directories(
     topic_filter_enabled: bool = False,
     selected_topics: Optional[Iterable[str]] = None,
     topic_rules: Optional[list] = None,
+    extension_filters: Optional[dict[str, list[str]]] = None,
 ) -> ScanPlan:
     """Scan multiple selected roots into one shared destination plan.
 
@@ -293,6 +299,7 @@ def scan_directories(
         output_root=output,
         selected_categories=selected,
         source_roots=normalized,
+        selected_extension_filters=normalize_extension_filters(extension_filters or {}),
     )
     failures: List[str] = []
     for index, source in enumerate(normalized, start=1):
@@ -308,6 +315,7 @@ def scan_directories(
                 topic_filter_enabled=topic_filter_enabled,
                 selected_topics=selected_topics,
                 topic_rules=topic_rules,
+                extension_filters=extension_filters,
             )
             combined.files.extend(part.files)
             combined.warnings.extend(part.warnings)

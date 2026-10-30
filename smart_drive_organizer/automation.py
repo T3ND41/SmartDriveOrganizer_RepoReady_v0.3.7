@@ -14,6 +14,7 @@ from typing import Any, Callable, Optional
 
 from .classifier import category_for, classify_selected_topic, classify_topic, extension_bucket, load_custom_rules, load_topic_rules, normalize_topic_rules, save_topic_rules, safe_folder_name, selected_topic_destination, selected_topic_destinations
 from .content_reader import read_document_text
+from .file_types import extension_is_selected, load_extension_filters, normalize_extension_filters
 from .models import PlannedFile, ScanPlan
 from .operations import _copy_verified, _unique_path, run_plan
 from .scanner import (
@@ -131,6 +132,7 @@ class AutomationConfig:
     stable_observations: int = DEFAULT_STABLE_OBSERVATIONS
     topic_filter_enabled: bool = False
     selected_topics: list[str] = field(default_factory=list)
+    extension_filters: dict[str, list[str]] = field(default_factory=load_extension_filters)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AutomationConfig":
@@ -150,6 +152,7 @@ class AutomationConfig:
             stable_observations=max(2, min(12, int(data.get("stable_observations", defaults.stable_observations)))),
             topic_filter_enabled=bool(data.get("topic_filter_enabled", defaults.topic_filter_enabled)),
             selected_topics=[str(item) for item in data.get("selected_topics", defaults.selected_topics) if str(item).strip()] if isinstance(data.get("selected_topics", defaults.selected_topics), list) else defaults.selected_topics,
+            extension_filters=normalize_extension_filters(data.get("extension_filters", defaults.extension_filters)),
         )
 
 
@@ -339,6 +342,8 @@ def _organize_file(source: Path, config: AutomationConfig, roots: list[Path], ru
     category = category_for(source)
     if category not in config.categories:
         return {"status": "ignored", "reason": f"File category '{category}' is not enabled; original file left untouched."}
+    if not extension_is_selected(source, category, config.extension_filters):
+        return {"status": "ignored", "reason": f"File format '{source.suffix or '(no extension)'}' is not selected for {category}; original file left untouched."}
     content = ""
     try:
         if config.read_document_text and category == "Documents" and source.stat().st_size <= 20 * 1024 * 1024:

@@ -22,6 +22,7 @@ from .operations import latest_movable_journal, run_plan, undo_move_journal
 from .scanner import scan_directories
 from .topic_rules_ui import TopicRulesDialog
 from .github_publish_ui import GitHubPublishDialog
+from .file_types import FileTypeSelectionDialog, extension_filter_summary, load_extension_filters, save_extension_filters
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
@@ -66,6 +67,8 @@ class OrganizerApp(tk.Tk):
         self.recursive_var = tk.BooleanVar(value=True)
         self.content_var = tk.BooleanVar(value=True)
         self.category_vars = {name: tk.BooleanVar(value=(name == "Documents")) for name in CATEGORIES}
+        self.extension_filters = load_extension_filters()
+        self.file_format_summary_var = tk.StringVar(value=extension_filter_summary(["Documents"], self.extension_filters))
         saved_automation = load_settings()
         self.topic_filter_var = tk.BooleanVar(value=saved_automation.topic_filter_enabled)
         self.topic_rules = load_topic_rules(topic_rules_file())
@@ -145,6 +148,8 @@ class OrganizerApp(tk.Tk):
         type_buttons.grid(row=2, column=0, columnspan=5, sticky="w", pady=(5, 0))
         ttk.Button(type_buttons, text="Select all", command=lambda: self._select_categories(True)).pack(side="left")
         ttk.Button(type_buttons, text="Clear", command=lambda: self._select_categories(False)).pack(side="left", padx=(6, 0))
+        ttk.Button(type_buttons, text="Choose formats…", command=self._choose_file_formats).pack(side="left", padx=(6, 0))
+        ttk.Label(filetypes, textvariable=self.file_format_summary_var, style="Sub.TLabel").grid(row=3, column=0, columnspan=5, sticky="w", pady=(5, 0))
 
         action = ttk.LabelFrame(options, text="3. How to organize", style="Card.TLabelframe", padding=10)
         action.pack(side="left", fill="y", padx=(8, 0))
@@ -317,6 +322,22 @@ class OrganizerApp(tk.Tk):
     def _selected_categories(self) -> list[str]:
         return [name for name, variable in self.category_vars.items() if variable.get()]
 
+    def _choose_file_formats(self) -> None:
+        categories = self._selected_categories()
+        if not categories:
+            messagebox.showwarning("Choose a file family", "First select one or more broad file families, such as Documents, Images or Videos.", parent=self)
+            return
+        dialog = FileTypeSelectionDialog(self, categories, self.extension_filters)
+        self.wait_window(dialog)
+        if dialog.result is not None:
+            self.extension_filters = dialog.result
+            try:
+                save_extension_filters(self.extension_filters)
+            except OSError as error:
+                messagebox.showerror("Could not save file-format selection", str(error), parent=self)
+                return
+            self.file_format_summary_var.set(extension_filter_summary(categories, self.extension_filters))
+
     def _set_busy(self, busy: bool, message: str = "") -> None:
         self.busy = busy
         state = "disabled" if busy else "normal"
@@ -451,6 +472,7 @@ class OrganizerApp(tk.Tk):
             topic_filter_enabled=self.topic_filter_var.get(),
             selected_topics=selected_topics,
             topic_rules=topic_rules,
+            extension_filters=self.extension_filters,
         ))
 
     def _apply(self) -> None:

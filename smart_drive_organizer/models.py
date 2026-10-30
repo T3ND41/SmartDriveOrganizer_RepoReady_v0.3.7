@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 
 @dataclass
@@ -27,6 +27,7 @@ class ScanPlan:
     skipped_count: int = 0
     scanned_count: int = 0
     source_roots: List[Path] = field(default_factory=list)
+    selected_extension_filters: Dict[str, List[str]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.source_roots:

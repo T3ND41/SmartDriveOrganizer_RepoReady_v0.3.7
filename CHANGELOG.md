@@ -1,3 +1,12 @@
+## 0.3.8 — Select exact file formats
+
+- Added a second-stage picker for Documents, Images, Videos, Audio, Archives, Code, Applications, Fonts, 3D Models and Others.
+- Listed common extensions first and additional/specialist extensions separately.
+- Added All supported formats, Only selected formats, Select common, Select all and Clear controls.
+- Persisted choices locally and enforced them in manual scans and background monitoring.
+- Unselected extensions remain in their original locations.
+- Corrected Windows CI fixtures to use project-local temporary directories instead of protected AppData.
+
 # Changelog
 
 ## 0.3.6 — One-line installer and automated Windows releases

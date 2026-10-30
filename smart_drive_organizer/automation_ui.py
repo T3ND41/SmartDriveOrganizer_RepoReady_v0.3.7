@@ -9,6 +9,7 @@ from typing import Callable
 from .classifier import load_topic_rules, save_topic_rules
 from .topic_rules_ui import TopicRulesDialog
 from .github_publish_ui import GitHubPublishDialog
+from .file_types import FileTypeSelectionDialog, extension_filter_summary, save_extension_filters
 
 from .automation import (
     AutomationConfig,
@@ -37,6 +38,7 @@ class AutomationSettingsDialog(tk.Toplevel):
         self.transient(parent)
         self.grab_set()
         self.config_data = load_settings()
+        self.extension_filters = dict(self.config_data.extension_filters)
         self.folder_paths = list(self.config_data.monitor_folders)
         self.topic_rules_path = topic_rules_path()
         self.topic_rules = load_topic_rules(self.topic_rules_path)
@@ -85,9 +87,16 @@ class AutomationSettingsDialog(tk.Toplevel):
             ttk.Checkbutton(options, text=category, variable=self.category_vars[category]).grid(
                 row=row, column=col, sticky="w", padx=(0, 12), pady=3
             )
+        self.file_format_summary_var = tk.StringVar(value=extension_filter_summary(self.config_data.categories, self.extension_filters))
+        ttk.Button(options, text="Choose file formats…", command=self._choose_file_formats).grid(
+            row=2, column=0, sticky="w", pady=(7, 0)
+        )
+        ttk.Label(options, textvariable=self.file_format_summary_var, wraplength=690).grid(
+            row=2, column=1, columnspan=4, sticky="w", padx=(8, 0), pady=(7, 0)
+        )
         self.read_content_var = tk.BooleanVar(value=self.config_data.read_document_text)
         ttk.Checkbutton(options, text="Read supported document text for better keyword matching", variable=self.read_content_var).grid(
-            row=2, column=0, columnspan=5, sticky="w", pady=(6, 0)
+            row=3, column=0, columnspan=5, sticky="w", pady=(6, 0)
         )
 
         topics = ttk.LabelFrame(outer, text="4. Optional selective organization — leave all other files untouched", padding=10)
@@ -164,6 +173,17 @@ class AutomationSettingsDialog(tk.Toplevel):
                 row=row, column=col, sticky="w", padx=(0, 18), pady=2
             )
 
+    def _choose_file_formats(self) -> None:
+        categories = [name for name, variable in self.category_vars.items() if variable.get()]
+        if not categories:
+            messagebox.showwarning("Choose a file family", "First select one or more broad file families, such as Documents, Images or Videos.", parent=self)
+            return
+        dialog = FileTypeSelectionDialog(self, categories, self.extension_filters)
+        self.wait_window(dialog)
+        if dialog.result is not None:
+            self.extension_filters = dialog.result
+            self.file_format_summary_var.set(extension_filter_summary(categories, self.extension_filters))
+
     def _publish_topic_rules(self) -> None:
         GitHubPublishDialog(self, self.topic_rules_path)
 
@@ -227,6 +247,7 @@ class AutomationSettingsDialog(tk.Toplevel):
             stable_observations=self.config_data.stable_observations,
             topic_filter_enabled=topic_filter_enabled,
             selected_topics=[name for name, variable in self.topic_vars.items() if variable.get()],
+            extension_filters=self.extension_filters,
         )
         try:
             if config.enabled:
@@ -234,6 +255,7 @@ class AutomationSettingsDialog(tk.Toplevel):
             if config.start_with_windows and not config.enabled:
                 raise ValueError("Enable automatic monitoring before enabling Windows startup.")
             save_settings(config)
+            save_extension_filters(self.extension_filters)
             set_windows_startup(config.start_with_windows)
         except Exception as error:
             messagebox.showerror("Could not save automation settings", str(error), parent=self)

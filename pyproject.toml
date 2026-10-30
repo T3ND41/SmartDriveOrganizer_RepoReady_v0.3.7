@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-drive-organizer"
-version = "0.3.7"
+version = "0.3.8"
 description = "Local-first file organizer with optional automatic background monitoring"
 readme = "README.md"
 requires-python = ">=3.10"

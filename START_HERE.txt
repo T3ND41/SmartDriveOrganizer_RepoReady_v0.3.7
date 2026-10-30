@@ -1,4 +1,4 @@
-SMART DRIVE ORGANIZER 0.3.7 — START HERE
+SMART DRIVE ORGANIZER 0.3.8 — START HERE
 
 WHAT IS NEW
 Version 0.3.7 includes automatic background monitoring, user-defined partial keywords and exact destinations, plus paste-a-link GitHub publishing for shared rules and reviewed application source updates. Configure Downloads (and any other folders you want watched), set your topic rules and destinations, choose Copy or Move, and save. The monitor runs separately from the desktop window.
@@ -96,3 +96,11 @@ ONE-LINE INSTALLER DISTRIBUTION (0.3.7)
 - The release workflow builds the Windows EXE only on GitHub's Windows runner. No compiled EXE is included in this source archive.
 - The custom smart.drive.win alias requires control of drive.win DNS plus deployment of cloudflare/worker.js. Until that is configured, use the GitHub Raw URL.
 - irm | iex executes remote code. Inspect install.ps1 before running and only trust the repository endpoint.
+
+
+FILE FORMAT SELECTION (0.3.8)
+- Select one or more broad file families on the main screen or Automation Settings.
+- Click Choose file formats… to choose All supported formats or only selected extensions.
+- Common formats appear first; additional and specialist formats are listed below.
+- Documents common formats begin with PDF, DOCX, XLSX, XLS, CSV, PPTX, DOC, TXT, PPT and RTF.
+- Settings are saved locally and enforced by manual scans and the background monitor. Unselected extensions are left where they are.

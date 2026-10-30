@@ -72,7 +72,7 @@ The standalone Windows application uses Git installed and authenticated on that 
 
 ## Public repository and one-line installer distribution (0.3.6)
 
-Repository target for this build: `T3ND41/SmartDriveOrganizer_RepoReady_v0.3.7` (public, because the Raw bootstrap and release assets must be anonymously readable). The source contains no local settings, databases, activity logs, personal documents or drive-specific paths. Review `.gitignore` before adding any files.
+Repository target for this build: `T3ND41/SmartDriveOrganizer_RepoReady_v0.3.7_RepoReady_v0.3.8` (public, because the Raw bootstrap and release assets must be anonymously readable). The source contains no local settings, databases, activity logs, personal documents or drive-specific paths. Review `.gitignore` before adding any files.
 
 ### First release
 
@@ -87,7 +87,7 @@ Repository target for this build: `T3ND41/SmartDriveOrganizer_RepoReady_v0.3.7` 
 After the public repository and first release exist, this command downloads and installs the latest release automatically:
 
 ```powershell
-irm https://raw.githubusercontent.com/T3ND41/SmartDriveOrganizer_RepoReady_v0.3.7/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/T3ND41/SmartDriveOrganizer_RepoReady_v0.3.7_RepoReady_v0.3.8/main/install.ps1 | iex
 ```
 
 The installer runs per-user, checks the downloaded ZIP SHA-256 hash against the release manifest, installs the EXE into `%LOCALAPPDATA%\Programs\SmartDriveOrganizer`, creates a Start Menu shortcut and starts the app. It aborts if the app is currently running or if the checksum does not match.
