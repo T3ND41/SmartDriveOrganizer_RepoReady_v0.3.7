@@ -38,5 +38,33 @@ class ContentReaderTests(unittest.TestCase):
             self.assertEqual(read_document_text(path), "")
 
 
+    def test_legacy_word_file_routes_to_optional_windows_reader(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "legacy.doc"
+            path.write_bytes(b"legacy Word placeholder")
+            with patch("smart_drive_organizer.content_reader._legacy_office_text", return_value="legacy Word text") as reader:
+                self.assertEqual(read_document_text(path), "legacy Word text")
+                reader.assert_called_once_with(path, "word")
+
+    def test_legacy_excel_file_routes_to_optional_windows_reader(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "legacy.xls"
+            path.write_bytes(b"legacy Excel placeholder")
+            with patch("smart_drive_organizer.content_reader._legacy_office_text", return_value="legacy Excel text") as reader:
+                self.assertEqual(read_document_text(path), "legacy Excel text")
+                reader.assert_called_once_with(path, "excel")
+
+    def test_legacy_powerpoint_file_routes_to_optional_windows_reader(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "legacy.ppt"
+            path.write_bytes(b"legacy PowerPoint placeholder")
+            with patch("smart_drive_organizer.content_reader._legacy_office_text", return_value="legacy PowerPoint text") as reader:
+                self.assertEqual(read_document_text(path), "legacy PowerPoint text")
+                reader.assert_called_once_with(path, "powerpoint")
+
+
 if __name__ == "__main__":
     unittest.main()
