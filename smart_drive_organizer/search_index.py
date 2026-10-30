@@ -52,10 +52,14 @@ class SearchIndex:
                 created_ts REAL NOT NULL,
                 topic TEXT NOT NULL DEFAULT '',
                 body TEXT NOT NULL DEFAULT '',
+                text_indexed INTEGER NOT NULL DEFAULT 0,
                 content_hash TEXT NOT NULL DEFAULT '',
                 indexed_ts REAL NOT NULL
             )
         """)
+        columns = {row["name"] for row in self.db.execute("PRAGMA table_info(indexed_files)")}
+        if "text_indexed" not in columns:
+            self.db.execute("ALTER TABLE indexed_files ADD COLUMN text_indexed INTEGER NOT NULL DEFAULT 0")
         self.db.execute("CREATE INDEX IF NOT EXISTS idx_files_ext ON indexed_files(extension)")
         self.db.execute("CREATE INDEX IF NOT EXISTS idx_files_modified ON indexed_files(modified_ts)")
         self.db.execute("CREATE INDEX IF NOT EXISTS idx_files_category ON indexed_files(category)")
@@ -72,37 +76,39 @@ class SearchIndex:
         finally:
             self.db.close()
 
-    def needs_refresh(self, path: Path) -> bool:
+    def needs_refresh(self, path: Path, require_text: bool = False) -> bool:
         try:
             stat = path.stat()
             row = self.db.execute(
-                "SELECT size_bytes, modified_ts FROM indexed_files WHERE path=?",
+                "SELECT size_bytes, modified_ts, text_indexed FROM indexed_files WHERE path=?",
                 (str(path.resolve()),),
             ).fetchone()
-            return row is None or row["size_bytes"] != stat.st_size or row["modified_ts"] != stat.st_mtime
+            return (row is None or row["size_bytes"] != stat.st_size
+                    or row["modified_ts"] != stat.st_mtime
+                    or (require_text and not bool(row["text_indexed"])))
         except OSError:
             return False
 
-    def upsert_file(self, path: Path, category: str, body: str = "", topic: str = "") -> None:
+    def upsert_file(self, path: Path, category: str, body: str = "", topic: str = "", text_indexed: bool = False) -> None:
         stat = path.stat()
         resolved = str(path.resolve())
         now = time.time()
         values = (
             resolved, path.name, path.suffix.lower(), category, int(stat.st_size),
             float(stat.st_mtime), float(getattr(stat, "st_ctime", stat.st_mtime)),
-            topic, body[:250000], now,
+            topic, body[:250000], int(text_indexed), now,
         )
         old = self.db.execute("SELECT id FROM indexed_files WHERE path=?", (resolved,)).fetchone()
         if old:
             row_id = int(old["id"])
             self.db.execute("""
                 UPDATE indexed_files SET name=?, extension=?, category=?, size_bytes=?,
-                    modified_ts=?, created_ts=?, topic=?, body=?, indexed_ts=? WHERE id=?
+                    modified_ts=?, created_ts=?, topic=?, body=?, text_indexed=?, indexed_ts=? WHERE id=?
             """, values[1:] + (row_id,))
         else:
             cursor = self.db.execute("""
-                INSERT INTO indexed_files(path,name,extension,category,size_bytes,modified_ts,created_ts,topic,body,indexed_ts)
-                VALUES(?,?,?,?,?,?,?,?,?,?)
+                INSERT INTO indexed_files(path,name,extension,category,size_bytes,modified_ts,created_ts,topic,body,text_indexed,indexed_ts)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?)
             """, values)
             row_id = int(cursor.lastrowid)
         if self.fts_available:
@@ -241,12 +247,13 @@ def build_index(source_roots: Iterable[Path], categories: Iterable[str],
                     if not path.is_file():
                         skipped += 1
                         continue
-                    if not index.needs_refresh(path):
+                    text_supported = extract_text and category in TEXT_CATEGORIES
+                    if not index.needs_refresh(path, require_text=text_supported):
                         indexed += 1
                         continue
-                    body = read_document_text(path) if extract_text and category in TEXT_CATEGORIES else ""
+                    body = read_document_text(path) if text_supported else ""
                     topic, _reason, _confidence = classify_topic(path, category, body, custom_rules)
-                    index.upsert_file(path, category, body, topic)
+                    index.upsert_file(path, category, body, topic, text_indexed=text_supported)
                     refreshed += 1
                     indexed += 1
                 except (OSError, ValueError) as error:
