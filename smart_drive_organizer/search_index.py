@@ -134,6 +134,18 @@ class SearchIndex:
                 (row_id, row["name"], row["body"], str(path.parent), topic),
             )
 
+    def refresh_classification(self, path: Path, category: str, custom_rules: Optional[list] = None) -> str:
+        """Reclassify an unchanged indexed file from its saved text and current rules."""
+        resolved = str(path.resolve())
+        row = self.db.execute(
+            "SELECT body FROM indexed_files WHERE path=?", (resolved,)
+        ).fetchone()
+        if row is None:
+            return ""
+        topic, _reason, _confidence = classify_topic(path, category, str(row["body"] or ""), custom_rules or [])
+        self.update_topic(path, topic)
+        return topic
+
     def count(self) -> int:
         return int(self.db.execute("SELECT COUNT(*) FROM indexed_files").fetchone()[0])
 
@@ -141,10 +153,15 @@ class SearchIndex:
                extension: str = "", topic: str = "", date_from: str = "",
                date_to: str = "", min_size_mb: str = "", max_size_mb: str = "",
                limit: int = DEFAULT_LIMIT) -> list[dict[str, Any]]:
+        from datetime import datetime, timedelta
+        from math import isfinite
+
         clauses: list[str] = []
         params: list[Any] = []
         join = ""
-        terms = re.findall(r"[\w]+", query, flags=re.UNICODE)
+        terms = re.findall(r"[\\w]+", query, flags=re.UNICODE)
+        if query.strip() and not terms:
+            return []
         if terms:
             if self.fts_available:
                 join = " JOIN file_fts ON file_fts.rowid=indexed_files.id"
@@ -159,37 +176,69 @@ class SearchIndex:
             clauses.append("path LIKE ?")
             params.append("%" + location.strip() + "%")
         if category and category != "Any":
-            clauses.append("category=?"); params.append(category)
+            clauses.append("category=?")
+            params.append(category)
         if extension.strip():
             ext = extension.strip().lower()
-            if not ext.startswith("."): ext = "." + ext
-            clauses.append("extension=?"); params.append(ext)
+            if not ext.startswith("."):
+                ext = "." + ext
+            clauses.append("extension=?")
+            params.append(ext)
         if topic.strip():
-            clauses.append("indexed_files.topic LIKE ?"); params.append("%" + topic.strip() + "%")
-        if date_from.strip():
+            clauses.append("indexed_files.topic LIKE ?")
+            params.append("%" + topic.strip() + "%")
+
+        parsed_from = None
+        parsed_to = None
+        try:
+            if date_from.strip():
+                parsed_from = datetime.strptime(date_from.strip(), "%Y-%m-%d")
+            if date_to.strip():
+                parsed_to = datetime.strptime(date_to.strip(), "%Y-%m-%d")
+        except ValueError as error:
+            raise ValueError("Dates must use YYYY-MM-DD.") from error
+        if parsed_from and parsed_to and parsed_to < parsed_from:
+            raise ValueError("The 'modified before' date cannot be earlier than the 'modified after' date.")
+        if parsed_from:
             clauses.append("modified_ts>=?")
-            params.append(time.mktime(time.strptime(date_from.strip(), "%Y-%m-%d")))
-        if date_to.strip():
+            params.append(time.mktime(parsed_from.timetuple()))
+        if parsed_to:
             clauses.append("modified_ts<?")
-            from datetime import datetime, timedelta
-            end = datetime.strptime(date_to.strip(), "%Y-%m-%d") + timedelta(days=1)
-            params.append(time.mktime(end.timetuple()))
-        if min_size_mb.strip():
+            params.append(time.mktime((parsed_to + timedelta(days=1)).timetuple()))
+
+        def parse_size(value: str, label: str) -> Optional[float]:
+            if not value.strip():
+                return None
+            try:
+                parsed = float(value)
+            except ValueError as error:
+                raise ValueError(f"{label} size must be a number of megabytes.") from error
+            if not isfinite(parsed) or parsed < 0:
+                raise ValueError(f"{label} size must be a finite non-negative number.")
+            return parsed
+
+        min_size = parse_size(min_size_mb, "Minimum")
+        max_size = parse_size(max_size_mb, "Maximum")
+        if min_size is not None and max_size is not None and max_size < min_size:
+            raise ValueError("Maximum size cannot be smaller than minimum size.")
+        if min_size is not None:
             clauses.append("size_bytes>=?")
-            params.append(float(min_size_mb) * 1024 * 1024)
-        if max_size_mb.strip():
+            params.append(min_size * 1024 * 1024)
+        if max_size is not None:
             clauses.append("size_bytes<=?")
-            params.append(float(max_size_mb) * 1024 * 1024)
+            params.append(max_size * 1024 * 1024)
+
         sql = "SELECT indexed_files.* FROM indexed_files" + join
-        if clauses: sql += " WHERE " + " AND ".join(clauses)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
         sql += " ORDER BY modified_ts DESC LIMIT ?"
         params.append(max(1, min(int(limit), 5000)))
         rows = self.db.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
-    def all_records(self, limit: int = 12000) -> list[dict[str, Any]]:
+    def all_records(self, limit: int = 50000) -> list[dict[str, Any]]:
         rows = self.db.execute(
-            "SELECT * FROM indexed_files ORDER BY path LIMIT ?", (max(1, min(limit, 50000)),)
+            "SELECT * FROM indexed_files ORDER BY path LIMIT ?", (max(1, min(limit, 100000)),)
         ).fetchall()
         return [dict(row) for row in rows]
 
@@ -265,6 +314,9 @@ def build_index(source_roots: Iterable[Path], categories: Iterable[str],
                         continue
                     text_supported = extract_text and category in TEXT_CATEGORIES
                     if not index.needs_refresh(path, require_text=text_supported):
+                        # Saved text remains valid when only user topic rules have
+                        # changed. Refresh the topic without reparsing the file.
+                        index.refresh_classification(path, category, custom_rules)
                         indexed += 1
                         continue
                     body = read_document_text(path) if text_supported else ""
