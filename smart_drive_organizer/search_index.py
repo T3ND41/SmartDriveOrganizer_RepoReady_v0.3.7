@@ -10,6 +10,7 @@ from typing import Any, Callable, Iterable, Optional
 from .classifier import category_for, classify_topic, load_custom_rules
 from .content_reader import read_document_text
 from .file_types import extension_is_selected, normalize_extension_filters
+from .operation_control import OperationCancelled, OperationControl
 
 APP_DIR_NAME = "SmartDriveOrganizer"
 TEXT_CATEGORIES = {"Documents", "Code"}
@@ -318,7 +319,8 @@ def build_index(source_roots: Iterable[Path], categories: Iterable[str],
                 extension_filters: Optional[dict[str, list[str]]] = None,
                 progress: Optional[Callable[[str], None]] = None,
                 extract_text: bool = True,
-                database: Optional[Path] = None) -> dict[str, int]:
+                database: Optional[Path] = None,
+                control: Optional[OperationControl] = None) -> dict[str, int]:
     """Read-only indexing of supported files using the scanner's safety exclusions."""
     from .scanner import (
         PROTECTED_DIRECTORY_NAMES, PROTECTED_FILE_EXTENSIONS,
@@ -330,6 +332,8 @@ def build_index(source_roots: Iterable[Path], categories: Iterable[str],
     rules_path = app_data_dir() / "keyword_rules.json"
     custom_rules = load_custom_rules(rules_path)
     checked = indexed = refreshed = skipped = 0
+    cancelled = False
+    topic_counts: dict[str, int] = {}
     seen_roots: list[Path] = []
     for source in source_roots:
         root = Path(source).expanduser().resolve()
@@ -343,6 +347,12 @@ def build_index(source_roots: Iterable[Path], categories: Iterable[str],
             nonlocal skipped
             skipped += 1
         for current, dirs, filenames in os.walk(root, topdown=True, followlinks=False, onerror=onerror):
+            if control is not None:
+                try:
+                    control.checkpoint()
+                except OperationCancelled:
+                    cancelled = True
+                    break
             folder = Path(current)
             names = list(dirs)
             if folder != root and folder.name.casefold() in PROTECTED_DIRECTORY_NAMES:
@@ -361,6 +371,12 @@ def build_index(source_roots: Iterable[Path], categories: Iterable[str],
                     safe.append(name)
             dirs[:] = safe
             for filename in filenames:
+                if control is not None:
+                    try:
+                        control.checkpoint()
+                    except OperationCancelled:
+                        cancelled = True
+                        break
                 path = folder / filename
                 checked += 1
                 if filename.casefold() in PROTECTED_FILE_NAMES or path.suffix.casefold() in PROTECTED_FILE_EXTENSIONS or _is_reparse_or_link(path):
@@ -383,15 +399,20 @@ def build_index(source_roots: Iterable[Path], categories: Iterable[str],
                     body = read_document_text(path) if text_supported else ""
                     topic, _reason, _confidence = classify_topic(path, category, body, custom_rules)
                     index.upsert_file(path, category, body, topic, text_indexed=text_supported)
+                    topic_counts[topic] = topic_counts.get(topic, 0) + 1
                     refreshed += 1
                     indexed += 1
                 except (OSError, ValueError) as error:
                     skipped += 1
-                if progress and checked % 200 == 0:
-                    progress(f"Indexed {indexed:,} files; checked {checked:,}; skipped {skipped:,}.")
+                if progress and checked % 100 == 0:
+                    progress({"phase": "index", "root_index": len(seen_roots), "roots_total": len(seen_roots), "files_checked": checked, "files_indexed": indexed, "refreshed": refreshed, "skipped": skipped, "topics": dict(topic_counts), "current_root": str(root)})
+            if cancelled:
+                break
         if progress:
             progress(f"Finished indexing {root}.")
+        if cancelled:
+            break
     index.db.commit()
     total = index.count()
     index.close()
-    return {"checked": checked, "indexed": indexed, "refreshed": refreshed, "skipped": skipped, "total": total}
+    return {"checked": checked, "indexed": indexed, "refreshed": refreshed, "skipped": skipped, "total": total, "cancelled": cancelled, "topics": topic_counts}
