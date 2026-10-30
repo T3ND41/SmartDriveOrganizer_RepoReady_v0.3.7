@@ -68,5 +68,12 @@ class DiscoveryTests(unittest.TestCase):
             self.assertFalse(any(g.phrase == "lpo" for g in groups))
 
 
+    def test_duplicate_path_is_counted_once(self):
+        with tempfile.TemporaryDirectory() as temp:
+            candidates = self._files(Path(temp), ["LPO_2024.pdf"])
+            groups = discover_repeated_groups(candidates + candidates)
+            self.assertEqual(groups, [])
+
+
 if __name__ == "__main__":
     unittest.main()
