@@ -18,6 +18,7 @@ from .automation import (
 from .automation_ui import AutomationSettingsDialog
 from .drives import discover_drives
 from .models import ScanPlan
+from .discovery_ui import DiscoveryReviewDialog
 from .operations import latest_movable_journal, run_plan, undo_move_journal
 from .scanner import scan_directories
 from .topic_rules_ui import TopicRulesDialog
@@ -66,9 +67,9 @@ class OrganizerApp(tk.Tk):
         self.mode_var = tk.StringVar(value="copy")
         self.recursive_var = tk.BooleanVar(value=True)
         self.content_var = tk.BooleanVar(value=True)
-        self.category_vars = {name: tk.BooleanVar(value=(name == "Documents")) for name in CATEGORIES}
+        self.category_vars = {name: tk.BooleanVar(value=True) for name in CATEGORIES}
         self.extension_filters = load_extension_filters()
-        self.file_format_summary_var = tk.StringVar(value=extension_filter_summary(["Documents"], self.extension_filters))
+        self.file_format_summary_var = tk.StringVar(value=extension_filter_summary(CATEGORIES, self.extension_filters))
         saved_automation = load_settings()
         self.topic_filter_var = tk.BooleanVar(value=saved_automation.topic_filter_enabled)
         self.topic_rules = load_topic_rules(topic_rules_file())
@@ -188,7 +189,7 @@ class OrganizerApp(tk.Tk):
         intro = ttk.Frame(content, style="Page.TFrame")
         intro.pack(fill="x", pady=(0, 16))
         ttk.Label(intro, text="Organize your drives", style="PageTitle.TLabel").pack(anchor="w")
-        ttk.Label(intro, text="Choose what to scan, preview the proposed folders, and apply only when satisfied.", style="PageSub.TLabel").pack(anchor="w", pady=(4, 0))
+        ttk.Label(intro, text="Search selected drives, discover recurring file patterns, review the proposed groups, and organize only after approval.", style="PageSub.TLabel").pack(anchor="w", pady=(4, 0))
 
         locations = ttk.LabelFrame(content, text="01   SOURCE LOCATIONS", style="Card.TLabelframe", padding=14)
         locations.pack(fill="x", pady=(0, 12))
@@ -213,7 +214,7 @@ class OrganizerApp(tk.Tk):
         ttk.Label(locations, text="Output / destination folder", style="Card.TLabel").grid(row=1, column=0, sticky="w", padx=(0, 12), pady=8)
         ttk.Entry(locations, textvariable=self.output_var).grid(row=1, column=1, sticky="ew", pady=8)
         ttk.Button(locations, text="Browse…", style="Secondary.TButton", command=self._browse_output).grid(row=1, column=2, padx=(10, 0), pady=8)
-        ttk.Label(locations, text="Select one or more drives. The destination is excluded from scanning to prevent reprocessing.",
+        ttk.Label(locations, text="Deep search is read-only. Windows, Program Files, ProgramData, AppData, recovery folders, recycle bins, system files, project/dependency folders and linked folders are skipped to protect the operating system and installed applications. Network drives are opt-in.",
             style="Muted.TLabel", wraplength=900).grid(row=2, column=0, columnspan=3, sticky="w", pady=(5, 0))
 
         options = ttk.Frame(content, style="Page.TFrame")
@@ -260,6 +261,8 @@ class OrganizerApp(tk.Tk):
         controls.pack(fill="x", pady=(0, 12))
         self.scan_button = ttk.Button(controls, text="SCAN & PREVIEW", style="Primary.TButton", command=self._scan)
         self.scan_button.pack(side="left")
+        self.discovery_button = ttk.Button(controls, text="Review discovered groups", style="Secondary.TButton", command=self._review_discoveries, state="disabled")
+        self.discovery_button.pack(side="left", padx=(8, 0))
         self.apply_button = ttk.Button(controls, text="APPLY ORGANIZATION", style="Dark.TButton", command=self._apply, state="disabled")
         self.apply_button.pack(side="left", padx=(8, 0))
         self.undo_button = ttk.Button(controls, text="Undo last move", style="Secondary.TButton", command=self._undo)
@@ -474,6 +477,10 @@ class OrganizerApp(tk.Tk):
             assert isinstance(result, ScanPlan)
             self.plan = result
             self._show_plan(result)
+            self.discovery_button.configure(state="normal" if result.discovery_groups else "disabled")
+            if result.discovery_groups:
+                self.status_var.set(f"Found {len(result.discovery_groups):,} new recurring filename pattern(s). Review them before accepting any new group.")
+                self.after(180, self._review_discoveries)
         elif self.job_kind == "apply":
             data = result
             self.plan = None
@@ -515,7 +522,7 @@ class OrganizerApp(tk.Tk):
         self.summary_var.set(
             f"Preview: {len(plan.files):,} file(s), {size_gb:.2f} GB total; "
             f"{plan.scanned_count:,} files checked across {len(plan.source_roots):,} source(s); "
-            f"{plan.skipped_count:,} skipped. "
+            f"{plan.skipped_count:,} skipped; {len(plan.discovery_groups):,} new recurring patterns found. "
             + (f"Showing first {MAX_PREVIEW_ROWS:,} rows." if extra else "")
         )
         self.apply_button.configure(state="normal" if plan.files else "disabled")
@@ -540,6 +547,7 @@ class OrganizerApp(tk.Tk):
         output = Path(output_text).expanduser()
         rules = load_custom_rules(rules_file())
         self.plan = None
+        self.discovery_button.configure(state="disabled")
         self.apply_button.configure(state="disabled")
         for row in self.table.get_children():
             self.table.delete(row)
@@ -560,6 +568,60 @@ class OrganizerApp(tk.Tk):
             topic_rules=topic_rules,
             extension_filters=self.extension_filters,
         ))
+
+    def _review_discoveries(self) -> None:
+        if not self.plan or not self.plan.discovery_groups:
+            messagebox.showinfo("No discovered groups", "Run a deep scan first. New groups are suggested only when a filename pattern occurs in at least two distinct files.", parent=self)
+            return
+        dialog = DiscoveryReviewDialog(self, self.plan.discovery_groups)
+        self.wait_window(dialog)
+        if dialog.result:
+            self._approve_discovered_groups(dialog.result)
+
+    def _approve_discovered_groups(self, groups: list[dict]) -> None:
+        """Persist only user-approved patterns, then rescan to build a fresh preview."""
+        try:
+            if self.topic_filter_var.get():
+                rules = load_topic_rules(topic_rules_file())
+                for group in groups:
+                    name = str(group["name"]).strip()
+                    phrase = str(group["phrase"]).strip()
+                    category = str(group["category"])
+                    existing = next((rule for rule in rules if rule.get("name", "").casefold() == name.casefold()), None)
+                    if existing:
+                        existing["keywords"] = list(dict.fromkeys(list(existing.get("keywords", [])) + [phrase]))
+                        scopes = list(existing.get("categories", ["Any"]))
+                        existing["categories"] = ["Any"] if "Any" in scopes else list(dict.fromkeys(scopes + [category]))
+                    else:
+                        rules.append({"name": name, "keywords": [phrase], "categories": [category], "match_mode": "whole_phrase"})
+                save_topic_rules(topic_rules_file(), rules)
+                self.topic_rules = load_topic_rules(topic_rules_file())
+                self._refresh_topic_options()
+                for group in groups:
+                    name = str(group["name"])
+                    if name not in self.topic_vars:
+                        self.topic_vars[name] = tk.BooleanVar(value=True)
+                    self.topic_vars[name].set(True)
+            else:
+                rules = load_custom_rules(rules_file())
+                for group in groups:
+                    name = str(group["name"]).strip()
+                    phrase = str(group["phrase"]).strip()
+                    category = str(group["category"])
+                    existing = next((rule for rule in rules
+                                     if str(rule.get("name", "")).casefold() == name.casefold()
+                                     and str(rule.get("category", "Any")) == category), None)
+                    if existing:
+                        existing["keywords"] = list(dict.fromkeys(existing.get("keywords", []) + [phrase]))
+                    else:
+                        rules.append({"name": name, "keywords": [phrase], "category": category})
+                save_custom_rules(rules_file(), rules)
+        except Exception as error:
+            messagebox.showerror("Could not save discovered groups", str(error), parent=self)
+            return
+
+        self.status_var.set(f"Saved {len(groups):,} approved group rule(s). Running a fresh scan to build the organization preview…")
+        self._scan()
 
     def _apply(self) -> None:
         if not self.plan or not self.plan.files:
