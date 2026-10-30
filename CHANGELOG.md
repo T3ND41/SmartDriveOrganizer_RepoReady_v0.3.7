@@ -1,3 +1,10 @@
+## 0.4.0 — Branded desktop UI/UX
+
+- Refreshed the desktop workspace with a black navigation rail, white content cards and red action accents.
+- Added the supplied face-and-skull artwork as the application mark and window icon.
+- Added navigation shortcuts to locations, file formats and topic groups while retaining scan, preview, apply, undo, automation and GitHub actions.
+- Included the brand asset in the packaged Windows executable.
+
 ## 0.3.8 — Select exact file formats
 
 - Added a second-stage picker for Documents, Images, Videos, Audio, Archives, Code, Applications, Fonts, 3D Models and Others.

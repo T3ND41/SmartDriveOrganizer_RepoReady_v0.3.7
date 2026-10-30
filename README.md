@@ -1,8 +1,10 @@
-# Smart Drive Organizer — v0.3.8
+# Smart Drive Organizer — v0.4.0
 
-**Selectable file extensions for manual and automatic organization**
+**Branded desktop interface with selectable file extensions for manual and automatic organization**
 
-A local-first Windows file organizer with custom keyword routing, multi-drive scanning, persistent rules and optional background monitoring.
+A local-first Windows file organizer with a redesigned desktop workspace, custom keyword routing, multi-drive scanning, persistent rules and optional background monitoring.
+
+**Brand system:** black `#101010`, red `#D71920`, and white `#FFFFFF`. The supplied monochrome face-and-skull artwork is the application mark.
 
 ## One-line PowerShell installation
 
@@ -15,6 +17,12 @@ irm https://raw.githubusercontent.com/T3ND41/SmartDriveOrganizer_RepoReady_v0.3.
 The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, installs the per-user Windows application, creates a Start Menu shortcut and launches it.
 
 > This command executes a remote PowerShell installer. Inspect [install.ps1](install.ps1) before running it. The installer does not scan, move, copy, or delete your personal documents.
+
+## Interface refresh (v0.4.0)
+
+- Added a black navigation rail, white workspace cards, red primary actions and a consistent typography and spacing system.
+- Added the supplied monochrome artwork as the application mark and window icon.
+- Grouped locations, file formats, organization preferences, topic rules and preview into a scrollable workflow. Existing file operations and safety confirmations remain connected.
 
 ## Features
 
