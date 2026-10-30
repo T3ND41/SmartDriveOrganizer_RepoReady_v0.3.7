@@ -191,7 +191,12 @@ class SearchDashboardDialog(tk.Toplevel):
         xscroll = ttk.Scrollbar(result_frame, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
         self.tree.grid(row=0, column=0, sticky="nsew"); yscroll.grid(row=0, column=1, sticky="ns"); xscroll.grid(row=1, column=0, sticky="ew")
-        result_frame.rowconfigure(0, weight=1); result_frame.columnconfigure(0, weight=1)
+        result_frame.rowconfigure(0, weight=3); result_frame.columnconfigure(0, weight=1)
+        self.preview = tk.Text(result_frame, height=7, wrap="word", font=("Segoe UI", 9), relief="solid", borderwidth=1, bg=white, fg=black)
+        self.preview.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
+        self.preview.insert("1.0", "Select a result to preview its indexed text. The preview is stored locally and does not alter the original file.")
+        self.preview.configure(state="disabled")
+        self.tree.bind("<<TreeviewSelect>>", self._preview_selected)
         self.tree.bind("<Double-1>", lambda _e: self._open())
         actions = ttk.Frame(outer); actions.pack(fill="x", pady=(8, 0))
         ttk.Button(actions, text="Open file", command=self._open).pack(side="left")
@@ -248,6 +253,8 @@ class SearchDashboardDialog(tk.Toplevel):
             messagebox.showerror("Search failed", str(error), parent=self)
             return
         for child in self.tree.get_children(): self.tree.delete(child)
+        self.preview.configure(state="normal"); self.preview.delete("1.0", "end")
+        self.preview.insert("1.0", "Select a result to preview its indexed text."); self.preview.configure(state="disabled")
         for i, row in enumerate(self.rows):
             modified = datetime.fromtimestamp(row["modified_ts"]).strftime("%Y-%m-%d %H:%M")
             self.tree.insert("", "end", iid=str(i), values=(
@@ -255,6 +262,17 @@ class SearchDashboardDialog(tk.Toplevel):
                 modified, row["topic"], row["path"],
             ))
         self.status_var.set(f"Found {len(self.rows):,} result(s). Showing up to 5,000 matching indexed files.")
+
+    def _preview_selected(self, _event=None) -> None:
+        row = self._selected()
+        if not row:
+            return
+        body = str(row.get("body", "")).strip()
+        preview = body[:3000] if body else "No extracted text is available for this file. The filename and file metadata are still searchable."
+        self.preview.configure(state="normal")
+        self.preview.delete("1.0", "end")
+        self.preview.insert("1.0", f"{row['name']}\n{row['path']}\n\n{preview}")
+        self.preview.configure(state="disabled")
 
     def _selected(self) -> dict | None:
         selected = self.tree.selection()
