@@ -27,6 +27,7 @@ from .file_types import FileTypeSelectionDialog, extension_filter_summary, load_
 from .learning import record_discovery_decisions, record_filing_correction, memory_summary
 from .search_dashboard import SearchDashboardDialog
 from .memory_ui import LearningMemoryDialog
+from .search_index import sync_journal_actions
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
@@ -566,6 +567,8 @@ class OrganizerApp(tk.Tk):
                 + ("Original files were left in place (copy mode)." if mode == "copy" else "Files were relocated only after the safe move step succeeded.")
                 + (f"\nFiles with an original still in place: {data.get('source_kept', 0):,}. Check the run journal." if data.get("source_kept", 0) else "")
                 + f"\n\nAudit log:\n{data['journal_path']}"
+                + (f"\nLocal search index updated: {data.get('search_index_sync', {}).get('synced', 0):,} file record(s)." if data.get("search_index_sync", {}).get("synced") else "")
+                + (f"\nSearch index update warnings: {data.get('search_index_sync', {}).get('failed', 0):,}." if data.get("search_index_sync", {}).get("failed") else "")
             )
         elif self.job_kind == "undo":
             self.status_var.set(f"Undo finished: {result['restored']} restored; {result['skipped']} skipped.")
@@ -725,7 +728,17 @@ class OrganizerApp(tk.Tk):
         if not messagebox.askyesno("Confirm organization", warning, icon="warning"):
             return
         plan = self.plan
-        self._start_job("apply", lambda progress: run_plan(plan, mode, progress))
+        self._start_job("apply", lambda progress: self._run_plan_and_sync(plan, mode, progress))
+
+    def _run_plan_and_sync(self, plan: ScanPlan, mode: str, progress: Callable[[str], None]) -> dict:
+        result = run_plan(plan, mode, progress)
+        try:
+            result["search_index_sync"] = sync_journal_actions(result["journal"])
+        except Exception:
+            # The journal remains authoritative if indexing is unavailable.
+            # Search-index errors must never undo successful file actions.
+            result["search_index_sync"] = {"synced": 0, "failed": 1}
+        return result
 
     def _undo(self) -> None:
         output_text = self.output_var.get().strip()
