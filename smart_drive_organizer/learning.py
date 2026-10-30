@@ -124,3 +124,17 @@ def record_filing_correction(category: str, phrase: str, topic: str,
 def memory_summary(path: Optional[Path] = None) -> dict[str, int]:
     value = load_memory(path)
     return {key: len(value[key]) for key in ("approved_groups", "rejected_groups", "filing_corrections")}
+
+def forget_rejected_pattern(category: str, phrase: str,
+                            path: Optional[Path] = None) -> bool:
+    memory = load_memory(path)
+    key = _key(category, phrase)
+    before = len(memory["rejected_groups"])
+    memory["rejected_groups"] = [
+        item for item in memory["rejected_groups"]
+        if _key(str(item.get("category", "Any")), str(item.get("phrase", ""))) != key
+    ]
+    if len(memory["rejected_groups"]) == before:
+        return False
+    save_memory(memory, path)
+    return True
