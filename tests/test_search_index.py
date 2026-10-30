@@ -155,5 +155,68 @@ class SearchIndexTests(unittest.TestCase):
             index.close()
 
 
+    def test_copy_operation_adds_destination_without_dropping_source_search_record(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "Supplier Quotation.pdf"
+            destination = root / "Organized" / "Supplier Quotation.pdf"
+            source.write_bytes(b"quotation")
+            destination.parent.mkdir()
+            destination.write_bytes(b"quotation")
+            database = root / "index.sqlite3"
+            index = SearchIndex(database)
+            index.upsert_file(source, "Documents", "supplier quotation pressure test", "Quotations", text_indexed=True)
+            index.close()
+            from smart_drive_organizer.search_index import sync_file_operation
+            self.assertTrue(sync_file_operation(source, destination, "Documents", "Quotations", database=database))
+            index = SearchIndex(database)
+            rows = index.search(query="pressure test")
+            index.close()
+            self.assertEqual({row["path"] for row in rows}, {str(source.resolve()), str(destination.resolve())})
+
+    def test_move_operation_replaces_old_search_path_with_new_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "Supplier Invoice.pdf"
+            destination = root / "Organized" / "Supplier Invoice.pdf"
+            source.write_bytes(b"invoice")
+            destination.parent.mkdir()
+            destination.write_bytes(b"invoice")
+            database = root / "index.sqlite3"
+            index = SearchIndex(database)
+            index.upsert_file(source, "Documents", "supplier tax invoice", "Invoices", text_indexed=True)
+            index.close()
+            from smart_drive_organizer.search_index import sync_file_operation
+            self.assertTrue(sync_file_operation(source, destination, "Documents", "Invoices", remove_source=True, database=database))
+            index = SearchIndex(database)
+            rows = index.search(query="supplier tax invoice")
+            index.close()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["path"], str(destination.resolve()))
+
+    def test_build_index_refreshes_saved_topic_when_keyword_rules_change(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            source.mkdir()
+            item = source / "Unusual Name 2040.txt"
+            item.write_text("special supplier quotation for this project", encoding="utf-8")
+            app_data = root / "appdata"
+            app_data.mkdir()
+            database = root / "index.sqlite3"
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(app_data)}):
+                build_index([source], ["Documents"], database=database)
+                save_custom_rules(app_data / "SmartDriveOrganizer" / "keyword_rules.json", [
+                    {"name": "Preferred Supplier Quotes", "keywords": ["supplier quotation"], "category": "Documents"}
+                ])
+                result = build_index([source], ["Documents"], database=database)
+                index = SearchIndex(database)
+                rows = index.search(query="special supplier", topic="Preferred Supplier Quotes")
+                index.close()
+            self.assertEqual(result["refreshed"], 0)
+            self.assertEqual(len(rows), 1)
+
+
+
 if __name__ == "__main__":
     unittest.main()
