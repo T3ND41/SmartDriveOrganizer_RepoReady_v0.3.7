@@ -89,5 +89,26 @@ class SearchIndexTests(unittest.TestCase):
             self.assertEqual(rows[0]["topic"], "Quotations")
 
 
+    def test_build_index_upgrades_metadata_only_record_to_full_text(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            source.mkdir()
+            item = source / "Unusual Filename.txt"
+            item.write_text("contains unique calibration phrase for full text lookup", encoding="utf-8")
+            database = root / "index.sqlite3"
+            index = SearchIndex(database)
+            index.upsert_file(item, "Documents", "", text_indexed=False)
+            self.assertTrue(index.needs_refresh(item, require_text=True))
+            index.close()
+            result = build_index([source], ["Documents"], database=database, extract_text=True)
+            index = SearchIndex(database)
+            matches = index.search(query="calibration phrase")
+            index.close()
+            self.assertEqual(result["refreshed"], 1)
+            self.assertEqual(len(matches), 1)
+            self.assertTrue(matches[0]["body"])
+
+
 if __name__ == "__main__":
     unittest.main()
