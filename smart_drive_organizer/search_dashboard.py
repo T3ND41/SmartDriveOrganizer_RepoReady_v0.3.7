@@ -61,7 +61,14 @@ class DuplicateReviewDialog(tk.Toplevel):
         style.configure("Primary.TButton", background=red, foreground=white, font=("Segoe UI", 9, "bold"), padding=9)
         outer = ttk.Frame(self, padding=14); outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="Review possible duplicates and revisions", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(outer, text=f"Checked {result.get('records_checked', 0):,} indexed files and found {result.get('total_groups', 0):,} groups. No files were changed or deleted.", wraplength=940).pack(anchor="w", pady=(5, 12))
+        coverage = (
+            f"Checked {result.get('records_checked', 0):,} of {result.get('index_total', result.get('records_checked', 0)):,} indexed files; "
+            f"found {result.get('total_groups', 0):,} groups. "
+            "No files were changed or deleted."
+        )
+        if result.get("truncated"):
+            coverage += " The analysis reached its 50,000-file review limit, so some indexed files were not included."
+        ttk.Label(outer, text=coverage, wraplength=940).pack(anchor="w", pady=(5, 12))
         body = ttk.Frame(outer); body.pack(fill="both", expand=True)
         left = ttk.Frame(body); left.pack(side="left", fill="both", expand=True)
         self.tree = ttk.Treeview(left, columns=("kind", "count", "similarity", "match"), show="headings", height=16)
@@ -302,8 +309,32 @@ class SearchDashboardDialog(tk.Toplevel):
         ))
 
     def _start_duplicates(self) -> None:
-        if self.busy: return
-        self._start_worker("duplicates", lambda report: analyze_duplicates(progress=report))
+        if self.busy:
+            return
+        source_entries = self.parent_app._selected_source_entries()
+        sources = [path for path, _label in source_entries]
+        if not sources:
+            messagebox.showwarning(
+                "Select search locations",
+                "Return to the main window and select one or more drives or folders first. "
+                "Duplicate analysis refreshes the local index before comparing files.",
+                parent=self,
+            )
+            return
+        categories = list(self.categories)
+        extension_filters = self.parent_app.extension_filters
+
+        def index_then_analyze(report):
+            indexed = build_index(
+                sources, categories, extension_filters=extension_filters,
+                progress=lambda message: report("Indexing for duplicate analysis: " + message),
+                extract_text=True,
+            )
+            result = analyze_duplicates(progress=report)
+            result["index_result"] = indexed
+            return result
+
+        self._start_worker("duplicates", index_then_analyze)
 
     def _start_worker(self, kind: str, work) -> None:
         self.busy = True
