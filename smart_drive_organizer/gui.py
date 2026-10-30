@@ -531,7 +531,14 @@ class OrganizerApp(tk.Tk):
         else:
             self.status_var.set("Scan complete. Review the planned folders, then choose Apply organization.")
         if not plan.files:
-            messagebox.showwarning("No matching files", "No files matched the selected categories. Try selecting more file types or another source folder.")
+            if plan.discovery_groups:
+                messagebox.showinfo(
+                    "No current topic matches",
+                    "No files matched the currently selected topic groups, but the scan found recurring filename patterns. Review the discovered groups to decide whether to add them.",
+                    parent=self,
+                )
+            else:
+                messagebox.showwarning("No matching files", "No files matched the selected categories. Try selecting more file types or another source folder.")
 
     def _scan(self) -> None:
         selected_sources = self._selected_source_entries()
