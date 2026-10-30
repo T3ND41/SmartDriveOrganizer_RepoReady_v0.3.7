@@ -1,6 +1,5 @@
 from __future__ import annotations
 import os, re
-from collections import defaultdict
 from pathlib import Path
 from typing import Iterable, Optional
 from .classifier import BUILTIN_RULES, SELECTIVE_TOPIC_KEYWORDS, normalize_text
@@ -19,6 +18,7 @@ october november december monday tuesday wednesday thursday friday saturday sund
 """.split())
 TOKEN = re.compile(r"[A-Za-z]+")
 
+
 def _known(custom_rules: Optional[list], topic_rules: Optional[list]) -> set[str]:
     values = {normalize_text(k) for r in BUILTIN_RULES for k in r.get("keywords", [])}
     values.update(normalize_text(k) for group in SELECTIVE_TOPIC_KEYWORDS.values() for k in group)
@@ -32,6 +32,7 @@ def _known(custom_rules: Optional[list], topic_rules: Optional[list]) -> set[str
                     values.update(normalize_text(str(w)) for w in words if str(w).strip())
     return {v for v in values if v}
 
+
 def _tokens(stem: str) -> list[tuple[str, str]]:
     result = []
     for raw in TOKEN.findall(stem):
@@ -42,48 +43,56 @@ def _tokens(stem: str) -> list[tuple[str, str]]:
         result.append((key, raw if acronym else raw.title()))
     return result
 
+
 def discover_repeated_groups(candidates: Iterable[tuple[Path, str]],
                               custom_rules: Optional[list] = None,
                               topic_rules: Optional[list] = None,
                               min_files: int = 2, max_groups: int = 60) -> list[DiscoveryGroup]:
-    """Discover repeated filename patterns across distinct files, without changing them."""
+    """Count repeated filename patterns across distinct scanned files, read-only."""
     min_files = max(2, min_files)
     known = _known(custom_rules, topic_rules)
-    members: dict[tuple[str, str], dict] = {}
+    known_single_terms = {word for phrase in known for word in phrase.split()}
+    # Keep only counts and up to five examples per pattern. Avoid a path set for
+    # every phrase, which would consume excessive memory on large drives.
+    counts: dict[tuple[str, str], dict] = {}
     for path, category in candidates:
         path = Path(path)
         words = _tokens(path.stem)
-        keys = {}
+        keys: dict[str, list[str]] = {}
         for size in (1, 2, 3):
             for i in range(max(0, len(words) - size + 1)):
                 part = words[i:i + size]
                 phrase = " ".join(w[0] for w in part)
-                if phrase and phrase not in known:
-                    keys[phrase] = [w[1] for w in part]
-        path_key = os.path.normcase(str(path))
+                if not phrase or phrase in known or (size == 1 and phrase in known_single_terms):
+                    continue
+                keys[phrase] = [w[1] for w in part]
         for phrase, display in keys.items():
-            row = members.setdefault((category, phrase), {"paths": {}, "display": display})
-            row["paths"][path_key] = path
+            row = counts.setdefault((category, phrase), {"count": 0, "display": display, "samples": []})
+            row["count"] += 1
+            if len(row["samples"]) < 5:
+                row["samples"].append(path)
 
     ranked = []
-    for (category, phrase), row in members.items():
-        paths = sorted(row["paths"].values(), key=lambda p: (p.name.casefold(), str(p).casefold()))
-        if len(paths) >= min_files:
-            ranked.append((category, phrase, paths, row["display"]))
-    ranked.sort(key=lambda x: (-len(x[2]), -len(x[1].split()), -len(x[1]), x[0].casefold(), x[1]))
+    for (category, phrase), row in counts.items():
+        if row["count"] >= min_files:
+            ranked.append((category, phrase, row["count"], row["display"], row["samples"]))
+    ranked.sort(key=lambda x: (-x[2], -len(x[1].split()), -len(x[1]), x[0].casefold(), x[1]))
 
-    seen: set[tuple[str, frozenset[str]]] = set()
-    result = []
-    for category, phrase, paths, display in ranked:
-        membership = (category, frozenset(os.path.normcase(str(p)) for p in paths))
-        if membership in seen:
+    # Collapse exact-looking duplicates using count and a small sample signature.
+    seen: set[tuple] = set()
+    result: list[DiscoveryGroup] = []
+    for category, phrase, count, display, samples in ranked:
+        signature = (category, count, tuple(os.path.normcase(str(p)) for p in samples))
+        if signature in seen:
             continue
-        seen.add(membership)
+        seen.add(signature)
         label = " ".join(display)
         if len(display) == 1 and display[0].isupper() and not display[0].endswith("S"):
             label += "s"
-        result.append(DiscoveryGroup(phrase, label, category, len(paths),
-                                     [p.name for p in paths[:5]], [str(p.parent) for p in paths[:5]]))
+        result.append(DiscoveryGroup(
+            phrase, label, category, count,
+            [p.name for p in samples], [str(p.parent) for p in samples],
+        ))
         if len(result) >= max_groups:
             break
     return result
