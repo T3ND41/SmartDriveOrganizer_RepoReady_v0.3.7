@@ -78,5 +78,23 @@ class DuplicateDetectionTests(unittest.TestCase):
                              {"Service Contract.pdf", "Service Contract v2.pdf"})
 
 
+    def test_reports_when_duplicate_analysis_limit_excludes_indexed_records(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            first = root / "A.pdf"
+            second = root / "B.pdf"
+            first.write_bytes(b"a")
+            second.write_bytes(b"b")
+            database = root / "index.sqlite3"
+            index = SearchIndex(database)
+            index.upsert_file(first, "Documents", "first")
+            index.upsert_file(second, "Documents", "second")
+            index.close()
+            result = analyze_duplicates(database, max_records=1)
+            self.assertEqual(result["records_checked"], 1)
+            self.assertEqual(result["index_total"], 2)
+            self.assertTrue(result["truncated"])
+
+
 if __name__ == "__main__":
     unittest.main()
