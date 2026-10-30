@@ -230,9 +230,12 @@ def scan_directory(
                     topic, reason, confidence = selected_match
                 else:
                     topic, reason, confidence = classify_topic(path, category, content, rules)
-                if needs_index and indexer is not None:
+                if indexer is not None:
                     try:
-                        indexer.upsert_file(path, category, content, topic, text_indexed=read_contents and text_supported)
+                        if needs_index:
+                            indexer.upsert_file(path, category, content, topic, text_indexed=read_contents and text_supported)
+                        else:
+                            indexer.update_topic(path, topic)
                     except OSError as index_error:
                         plan.warnings.append(f"Search index could not update {path.name}: {index_error}")
                 ext_folder = extension_bucket(path)
