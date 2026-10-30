@@ -160,7 +160,7 @@ class SearchIndex:
         clauses: list[str] = []
         params: list[Any] = []
         join = ""
-        terms = re.findall(r"[\\w]+", query, flags=re.UNICODE)
+        terms = re.findall(r"[\w]+", query, flags=re.UNICODE)
         if query.strip() and not terms:
             return []
         if terms:
