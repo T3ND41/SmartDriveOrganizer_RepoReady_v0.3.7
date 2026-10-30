@@ -253,6 +253,67 @@ class SearchIndex:
         return len(missing)
 
 
+
+def sync_file_operation(source: Path, destination: Path, category: str, topic: str,
+                        remove_source: bool = False,
+                        database: Optional[Path] = None) -> bool:
+    """Keep the local search index aligned with one completed Copy or Move action."""
+    target_db = database or index_database_path()
+    if not target_db.exists():
+        return False
+    source_path = str(Path(source).expanduser().resolve())
+    destination_path = Path(destination).expanduser().resolve()
+    index = SearchIndex(target_db)
+    try:
+        row = index.db.execute(
+            "SELECT category, topic, body, text_indexed FROM indexed_files WHERE path=?",
+            (source_path,),
+        ).fetchone()
+        indexed_category = str(row["category"]) if row else category
+        indexed_topic = str(topic or (row["topic"] if row else ""))
+        if row:
+            body = str(row["body"] or "")
+            text_indexed = bool(row["text_indexed"])
+        else:
+            text_supported = category in TEXT_CATEGORIES
+            body = read_document_text(destination_path) if text_supported else ""
+            text_indexed = bool(body)
+
+        if remove_source:
+            old = index.db.execute(
+                "SELECT id FROM indexed_files WHERE path=?", (source_path,)
+            ).fetchone()
+            if old:
+                old_id = int(old["id"])
+                if index.fts_available:
+                    index.db.execute("DELETE FROM file_fts WHERE rowid=?", (old_id,))
+                index.db.execute("DELETE FROM indexed_files WHERE id=?", (old_id,))
+
+        index.upsert_file(destination_path, indexed_category, body, indexed_topic, text_indexed=text_indexed)
+        index.db.commit()
+        return True
+    finally:
+        index.close()
+
+
+def sync_journal_actions(journal: dict, database: Optional[Path] = None) -> dict[str, int]:
+    """Reflect successful manual file actions in the local search index."""
+    synced = failed = 0
+    for action in journal.get("actions", []):
+        status = str(action.get("status", ""))
+        if status not in {"copied", "moved", "copied_source_kept"}:
+            continue
+        try:
+            synced += int(sync_file_operation(
+                Path(action["source"]), Path(action["destination"]),
+                str(action.get("category", "Others")), str(action.get("topic", "")),
+                remove_source=(status == "moved"), database=database,
+            ))
+        except (KeyError, OSError, sqlite3.Error, ValueError):
+            failed += 1
+    return {"synced": synced, "failed": failed}
+
+
 def build_index(source_roots: Iterable[Path], categories: Iterable[str],
                 extension_filters: Optional[dict[str, list[str]]] = None,
                 progress: Optional[Callable[[str], None]] = None,
