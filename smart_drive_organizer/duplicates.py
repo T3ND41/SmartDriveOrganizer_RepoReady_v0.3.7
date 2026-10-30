@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .search_index import SearchIndex
+from .operation_control import OperationControl
 
 WORD = re.compile(r"[\w]+", re.UNICODE)
 VERSION_MARKERS = re.compile(
@@ -44,7 +45,8 @@ def _tokens(text: str) -> set[str]:
 def analyze_duplicates(database: Path | None = None,
                        max_records: int = 50000,
                        similarity_threshold: float = 0.92,
-                       progress=None) -> dict[str, Any]:
+                       progress=None,
+                       control: OperationControl | None = None) -> dict[str, Any]:
     """Find exact byte duplicates, likely revisions and near-identical text files.
 
     This function only reads files and the local index. It never deletes, renames,
@@ -62,14 +64,16 @@ def analyze_duplicates(database: Path | None = None,
     exact_map: dict[str, list[dict]] = defaultdict(list)
     hashes: dict[str, str] = {}
     for number, row in enumerate(records, start=1):
+        if control is not None:
+            control.checkpoint()
         try:
             digest = sha256_file(Path(row["path"]))
             hashes[row["path"]] = digest
             exact_map[digest].append(row)
         except OSError:
             continue
-        if progress and number % 250 == 0:
-            progress(f"Checked file hashes: {number:,}/{len(records):,}.")
+        if progress and number % 100 == 0:
+            progress({"phase": "duplicates_hash", "records_checked": number, "records_total": len(records), "exact_groups": len(exact_map)})
 
     exact = []
     for digest, files in exact_map.items():
@@ -84,7 +88,9 @@ def analyze_duplicates(database: Path | None = None,
             })
 
     version_map: dict[tuple[str, str], list[tuple[dict, bool]]] = defaultdict(list)
-    for row in records:
+    for number, row in enumerate(records, start=1):
+        if control is not None:
+            control.checkpoint()
         key, marked = _version_key(row["name"])
         if key:
             version_map[(row["category"], key)].append((row, marked))
@@ -117,6 +123,8 @@ def analyze_duplicates(database: Path | None = None,
     max_posting = max(4, int(len(token_sets) * 0.20))
     candidate_pairs: set[tuple[str, str]] = set()
     for word, paths in postings.items():
+        if control is not None:
+            control.checkpoint()
         if len(paths) < 2 or len(paths) > max_posting:
             continue
         for i in range(len(paths)):
@@ -133,7 +141,11 @@ def analyze_duplicates(database: Path | None = None,
             break
 
     near_edges: list[tuple[str, str, float]] = []
-    for a, b in candidate_pairs:
+    for pair_index, (a, b) in enumerate(candidate_pairs, start=1):
+        if control is not None:
+            control.checkpoint()
+        if progress and pair_index % 250 == 0:
+            progress({"phase": "duplicates_compare", "pairs_checked": pair_index, "candidate_pairs": len(candidate_pairs)})
         left, right = token_sets[a], token_sets[b]
         # A quick length ratio gate avoids matching tiny excerpts to long documents.
         ratio = min(len(left), len(right)) / max(len(left), len(right))
