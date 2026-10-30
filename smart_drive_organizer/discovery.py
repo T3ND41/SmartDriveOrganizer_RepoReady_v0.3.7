@@ -1,4 +1,5 @@
 from __future__ import annotations
+import hashlib
 import os, re
 from pathlib import Path
 from typing import Iterable, Optional
@@ -66,23 +67,25 @@ def discover_repeated_groups(candidates: Iterable[tuple[Path, str]],
                 if not phrase or phrase in known or (size == 1 and phrase in known_single_terms):
                     continue
                 keys[phrase] = [w[1] for w in part]
+        path_key = os.path.normcase(str(path))
         for phrase, display in keys.items():
-            row = counts.setdefault((category, phrase), {"count": 0, "display": display, "samples": []})
+            row = counts.setdefault((category, phrase), {"count": 0, "display": display, "samples": [], "fingerprint": hashlib.sha256()})
             row["count"] += 1
+            row["fingerprint"].update(path_key.encode("utf-8", errors="surrogatepass") + b"\\0")
             if len(row["samples"]) < 5:
                 row["samples"].append(path)
 
     ranked = []
     for (category, phrase), row in counts.items():
         if row["count"] >= min_files:
-            ranked.append((category, phrase, row["count"], row["display"], row["samples"]))
+            ranked.append((category, phrase, row["count"], row["display"], row["samples"], row["fingerprint"].digest()))
     ranked.sort(key=lambda x: (-x[2], -len(x[1].split()), -len(x[1]), x[0].casefold(), x[1]))
 
     # Collapse exact-looking duplicates using count and a small sample signature.
     seen: set[tuple] = set()
     result: list[DiscoveryGroup] = []
-    for category, phrase, count, display, samples in ranked:
-        signature = (category, count, tuple(os.path.normcase(str(p)) for p in samples))
+    for category, phrase, count, display, samples, fingerprint in ranked:
+        signature = (category, count, fingerprint)
         if signature in seen:
             continue
         seen.add(signature)
