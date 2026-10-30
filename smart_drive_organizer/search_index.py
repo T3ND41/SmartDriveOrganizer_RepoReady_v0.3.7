@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
-from .classifier import category_for
+from .classifier import category_for, classify_topic, load_custom_rules
 from .content_reader import read_document_text
 from .file_types import extension_is_selected, normalize_extension_filters
 
@@ -195,6 +195,8 @@ def build_index(source_roots: Iterable[Path], categories: Iterable[str],
     selected = set(categories)
     filters = normalize_extension_filters(extension_filters or {})
     index = SearchIndex(database)
+    rules_path = app_data_dir() / "keyword_rules.json"
+    custom_rules = load_custom_rules(rules_path)
     checked = indexed = refreshed = skipped = 0
     seen_roots: list[Path] = []
     for source in source_roots:
@@ -243,7 +245,8 @@ def build_index(source_roots: Iterable[Path], categories: Iterable[str],
                         indexed += 1
                         continue
                     body = read_document_text(path) if extract_text and category in TEXT_CATEGORIES else ""
-                    index.upsert_file(path, category, body)
+                    topic, _reason, _confidence = classify_topic(path, category, body, custom_rules)
+                    index.upsert_file(path, category, body, topic)
                     refreshed += 1
                     indexed += 1
                 except (OSError, ValueError) as error:
