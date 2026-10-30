@@ -25,6 +25,7 @@ from .topic_rules_ui import TopicRulesDialog
 from .github_publish_ui import GitHubPublishDialog
 from .file_types import FileTypeSelectionDialog, extension_filter_summary, load_extension_filters, save_extension_filters
 from .learning import record_discovery_decisions, record_filing_correction, memory_summary
+from .search_dashboard import SearchDashboardDialog
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
@@ -150,6 +151,7 @@ class OrganizerApp(tk.Tk):
         nav_button("Locations", lambda: self._scroll_to_section("locations"))
         nav_button("File formats", lambda: self._scroll_to_section("filetypes"))
         nav_button("Topic groups & rules", lambda: self._scroll_to_section("selective"))
+        nav_button("Search all files", self._open_search_dashboard, accent=True)
         nav_button("Automation settings", self._open_automation_settings)
         nav_button("Activity log", self._open_activity_log)
         nav_button("GitHub publishing", self._open_github_publisher)
@@ -264,6 +266,8 @@ class OrganizerApp(tk.Tk):
         self.scan_button.pack(side="left")
         self.discovery_button = ttk.Button(controls, text="Review discovered groups", style="Secondary.TButton", command=self._review_discoveries, state="disabled")
         self.discovery_button.pack(side="left", padx=(8, 0))
+        self.teach_button = ttk.Button(controls, text="Teach selected file", style="Secondary.TButton", command=self._teach_selected_file, state="disabled")
+        self.teach_button.pack(side="left", padx=(8, 0))
         self.apply_button = ttk.Button(controls, text="APPLY ORGANIZATION", style="Dark.TButton", command=self._apply, state="disabled")
         self.apply_button.pack(side="left", padx=(8, 0))
         self.undo_button = ttk.Button(controls, text="Undo last move", style="Secondary.TButton", command=self._undo)
@@ -290,6 +294,7 @@ class OrganizerApp(tk.Tk):
         xscroll.grid(row=1, column=0, sticky="ew")
         preview.rowconfigure(0, weight=1)
         preview.columnconfigure(0, weight=1)
+        self.table.bind("<<TreeviewSelect>>", self._preview_selection_changed)
 
         footer = ttk.Frame(content, style="Page.TFrame")
         footer.pack(fill="x")
@@ -308,6 +313,66 @@ class OrganizerApp(tk.Tk):
         self.update_idletasks()
         total = max(1, self.content_frame.winfo_height())
         self.content_canvas.yview_moveto(max(0.0, min(1.0, target.winfo_y() / total)))
+
+    def _open_search_dashboard(self) -> None:
+        SearchDashboardDialog(self, CATEGORIES)
+
+    def _preview_selection_changed(self, _event=None) -> None:
+        enabled = bool(self.plan and self.table.selection() and not self.busy)
+        self.teach_button.configure(state="normal" if enabled else "disabled")
+
+    def _teach_selected_file(self) -> None:
+        if not self.plan:
+            return
+        selected = self.table.selection()
+        if not selected:
+            messagebox.showinfo("Select a file", "Select a file in the preview first.", parent=self)
+            return
+        try:
+            item = self.plan.files[int(selected[0])]
+        except (ValueError, IndexError):
+            messagebox.showerror("Selection unavailable", "The selected preview row could not be identified. Run the scan again.", parent=self)
+            return
+        from tkinter import simpledialog
+        suggested_name = simpledialog.askstring(
+            "Teach Smart Drive Organizer",
+            f"This file was suggested for '{item.topic}'. What folder/topic should similar files use?",
+            initialvalue=item.topic,
+            parent=self,
+        )
+        if not suggested_name or not suggested_name.strip():
+            return
+        phrase = simpledialog.askstring(
+            "Remember matching wording",
+            "Which word or phrase should identify similar files? You can enter an abbreviation or several words.",
+            initialvalue=item.source.stem,
+            parent=self,
+        )
+        if not phrase or not phrase.strip():
+            return
+        topic = " ".join(suggested_name.split()).strip(" .")
+        phrase = " ".join(phrase.split()).strip()
+        try:
+            rules = load_custom_rules(rules_file())
+            existing = next((rule for rule in rules
+                             if str(rule.get("name", "")).casefold() == topic.casefold()
+                             and str(rule.get("category", "Any")) in ("Any", item.category)), None)
+            if existing:
+                existing["keywords"] = list(dict.fromkeys(existing.get("keywords", []) + [phrase]))
+            else:
+                rules.append({"name": topic, "keywords": [phrase], "category": item.category})
+            save_custom_rules(rules_file(), rules)
+            destination = self.plan.output_root / item.category / topic / item.extension_folder
+            record_filing_correction(item.category, phrase, topic, str(item.source), str(destination))
+        except Exception as error:
+            messagebox.showerror("Could not remember correction", str(error), parent=self)
+            return
+        messagebox.showinfo(
+            "Filing preference remembered",
+            f"Smart Drive Organizer will remember that '{phrase}' belongs in '{topic}'. It will apply this preference on the next scan.",
+            parent=self,
+        )
+        self._scan()
 
     def _open_automation_settings(self) -> None:
         AutomationSettingsDialog(self, self._refresh_automation_status)
@@ -433,6 +498,7 @@ class OrganizerApp(tk.Tk):
         state = "disabled" if busy else "normal"
         self.scan_button.configure(state=state)
         self.apply_button.configure(state="disabled" if busy or not self.plan or not self.plan.files else "normal")
+        self.teach_button.configure(state="disabled" if busy or not self.plan or not self.plan.files or not self.table.selection() else "normal")
         if busy:
             self.progress.start(10)
             if message:
@@ -504,13 +570,13 @@ class OrganizerApp(tk.Tk):
     def _show_plan(self, plan: ScanPlan) -> None:
         for row in self.table.get_children():
             self.table.delete(row)
-        for item in plan.files[:MAX_PREVIEW_ROWS]:
+        for index, item in enumerate(plan.files[:MAX_PREVIEW_ROWS]):
             relative = item.destination
             try:
                 relative = item.destination.relative_to(plan.output_root)
             except ValueError:
                 pass
-            self.table.insert("", "end", values=(
+            self.table.insert("", "end", iid=str(index), values=(
                 item.source.name,
                 item.category,
                 item.topic,
