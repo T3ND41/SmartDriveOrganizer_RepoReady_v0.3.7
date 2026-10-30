@@ -42,7 +42,7 @@ def _tokens(text: str) -> set[str]:
 
 
 def analyze_duplicates(database: Path | None = None,
-                       max_records: int = 12000,
+                       max_records: int = 50000,
                        similarity_threshold: float = 0.92,
                        progress=None) -> dict[str, Any]:
     """Find exact byte duplicates, likely revisions and near-identical text files.
@@ -50,9 +50,13 @@ def analyze_duplicates(database: Path | None = None,
     This function only reads files and the local index. It never deletes, renames,
     moves or replaces any item.
     """
+    if not 0.0 <= similarity_threshold <= 1.0:
+        raise ValueError("Similarity threshold must be between 0 and 1.")
     index = SearchIndex(database)
+    index_total = index.count()
     records = index.all_records(max_records)
     index.close()
+    truncated = index_total > len(records)
     records = [row for row in records if Path(row["path"]).is_file()]
 
     exact_map: dict[str, list[dict]] = defaultdict(list)
@@ -176,6 +180,8 @@ def analyze_duplicates(database: Path | None = None,
         progress(f"Duplicate analysis complete: {len(exact)} exact, {len(versions)} version and {len(near)} near-identical groups.")
     return {
         "records_checked": len(records),
+        "index_total": index_total,
+        "truncated": truncated,
         "exact": exact,
         "versions": versions,
         "near": near,
