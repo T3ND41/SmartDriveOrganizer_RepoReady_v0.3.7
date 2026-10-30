@@ -753,7 +753,7 @@ class OrganizerApp(tk.Tk):
             messagebox.showwarning("No topics selected", "Select at least one topic group, or create your own using Add / manage my own topic groups.")
             return
         topic_rules = load_topic_rules(topic_rules_file())
-        self._start_job("scan", lambda progress: scan_directories(
+        self._start_job("scan", lambda progress, control: scan_directories(
             sources, output, selected,
             recursive=self.recursive_var.get(),
             read_contents=self.content_var.get(),
@@ -763,6 +763,7 @@ class OrganizerApp(tk.Tk):
             selected_topics=selected_topics,
             topic_rules=topic_rules,
             extension_filters=self.extension_filters,
+            control=control,
         ))
 
     def _review_discoveries(self) -> None:
@@ -842,10 +843,10 @@ class OrganizerApp(tk.Tk):
         if not messagebox.askyesno("Confirm organization", warning, icon="warning"):
             return
         plan = self.plan
-        self._start_job("apply", lambda progress: self._run_plan_and_sync(plan, mode, progress))
+        self._start_job("apply", lambda progress, control: self._run_plan_and_sync(plan, mode, progress, control))
 
-    def _run_plan_and_sync(self, plan: ScanPlan, mode: str, progress: Callable[[str], None]) -> dict:
-        result = run_plan(plan, mode, progress)
+    def _run_plan_and_sync(self, plan: ScanPlan, mode: str, progress: Callable[[object], None], control: OperationControl) -> dict:
+        result = run_plan(plan, mode, progress, control=control)
         try:
             result["search_index_sync"] = sync_journal_actions(result["journal"])
         except Exception:
@@ -865,7 +866,7 @@ class OrganizerApp(tk.Tk):
             return
         if not messagebox.askyesno("Undo last move", f"Restore files from this move run to their original paths?\n\n{journal}\n\nFiles will not overwrite anything already at the original locations.", icon="warning"):
             return
-        self._start_job("undo", lambda progress: self._undo_and_sync(journal, progress))
+        self._start_job("undo", lambda progress, control: self._undo_and_sync(journal, progress, control))
 
     def _undo_auto_move(self) -> None:
         config = load_settings()
@@ -886,8 +887,8 @@ class OrganizerApp(tk.Tk):
             return
         self._start_job("undo", lambda progress: self._undo_and_sync(journal, progress))
 
-    def _undo_and_sync(self, journal: Path, progress: Callable[[str], None]) -> object:
-        result = undo_move_journal(journal, progress)
+    def _undo_and_sync(self, journal: Path, progress: Callable[[object], None], control: OperationControl) -> object:
+        result = undo_move_journal(journal, progress, control)
         try:
             mark_undo_restored_sources(journal)
         except Exception:
