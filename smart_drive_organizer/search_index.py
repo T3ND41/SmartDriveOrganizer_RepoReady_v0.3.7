@@ -118,6 +118,22 @@ class SearchIndex:
                 (row_id, path.name, body[:250000], str(path.parent), topic),
             )
 
+    def update_topic(self, path: Path, topic: str) -> None:
+        resolved = str(path.resolve())
+        row = self.db.execute(
+            "SELECT id, name, body FROM indexed_files WHERE path=?", (resolved,)
+        ).fetchone()
+        if row is None:
+            return
+        row_id = int(row["id"])
+        self.db.execute("UPDATE indexed_files SET topic=? WHERE id=?", (topic, row_id))
+        if self.fts_available:
+            self.db.execute("DELETE FROM file_fts WHERE rowid=?", (row_id,))
+            self.db.execute(
+                "INSERT INTO file_fts(rowid,name,body,location,topic) VALUES(?,?,?,?,?)",
+                (row_id, row["name"], row["body"], str(path.parent), topic),
+            )
+
     def count(self) -> int:
         return int(self.db.execute("SELECT COUNT(*) FROM indexed_files").fetchone()[0])
 
