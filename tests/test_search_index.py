@@ -125,5 +125,35 @@ class SearchIndexTests(unittest.TestCase):
             index.close()
 
 
+    def test_topic_rules_can_refresh_without_reextracting_saved_text(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            item = root / "Supplier Offer.txt"
+            body = "supplier quotation for industrial valve and pressure test"
+            item.write_text(body, encoding="utf-8")
+            index = SearchIndex(root / "index.sqlite3")
+            index.upsert_file(item, "Documents", body, "Unclassified Documents", text_indexed=True)
+            topic = index.refresh_classification(
+                item, "Documents",
+                [{"name": "Supplier Quotations", "keywords": ["supplier quotation"], "category": "Documents"}],
+            )
+            rows = index.search(query="pressure test", topic="Supplier Quotations")
+            index.close()
+            self.assertEqual(topic, "Supplier Quotations")
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["body"], body)
+
+    def test_invalid_date_and_size_ranges_raise_clear_errors(self):
+        with tempfile.TemporaryDirectory() as temp:
+            index = SearchIndex(Path(temp) / "index.sqlite3")
+            with self.assertRaisesRegex(ValueError, "YYYY-MM-DD"):
+                index.search(date_from="30/10/2026")
+            with self.assertRaisesRegex(ValueError, "Maximum size"):
+                index.search(min_size_mb="20", max_size_mb="10")
+            with self.assertRaisesRegex(ValueError, "finite non-negative"):
+                index.search(min_size_mb="-1")
+            index.close()
+
+
 if __name__ == "__main__":
     unittest.main()
