@@ -88,120 +88,196 @@ class OrganizerApp(tk.Tk):
         self.after(120, self._poll_events)
 
     def _build_ui(self) -> None:
+        bg, white, black, red, muted, border = "#F4F4F5", "#FFFFFF", "#101010", "#D71920", "#737373", "#E4E4E7"
         style = ttk.Style(self)
+        try: style.theme_use("clam")
+        except tk.TclError: pass
+        style.configure("TFrame", background=bg)
+        style.configure("Page.TFrame", background=bg)
+        style.configure("Card.TFrame", background=white)
+        style.configure("TLabel", background=bg, foreground=black, font=("Segoe UI", 9))
+        style.configure("Card.TLabel", background=white, foreground=black, font=("Segoe UI", 9))
+        style.configure("Muted.TLabel", background=white, foreground=muted, font=("Segoe UI", 9))
+        style.configure("PageTitle.TLabel", background=bg, foreground=black, font=("Segoe UI", 22, "bold"))
+        style.configure("PageSub.TLabel", background=bg, foreground=muted, font=("Segoe UI", 9))
+        style.configure("Card.TLabelframe", background=white, borderwidth=1, relief="solid", bordercolor=border, lightcolor=border, darkcolor=border)
+        style.configure("Card.TLabelframe.Label", background=white, foreground=black, font=("Segoe UI", 10, "bold"))
+        style.configure("Card.TCheckbutton", background=white, foreground=black, font=("Segoe UI", 9))
+        style.map("Card.TCheckbutton", background=[("active", white)])
+        style.configure("Card.TRadiobutton", background=white, foreground=black, font=("Segoe UI", 9))
+        style.map("Card.TRadiobutton", background=[("active", white)])
+        style.configure("TEntry", padding=7, fieldbackground=white, foreground=black)
+        style.configure("TButton", font=("Segoe UI", 9), padding=(10, 7), background=white, foreground=black)
+        style.map("TButton", background=[("active", "#F1F1F1"), ("disabled", "#E5E5E5")])
+        style.configure("Primary.TButton", font=("Segoe UI", 9, "bold"), padding=(16, 10), background=red, foreground=white)
+        style.map("Primary.TButton", background=[("active", "#B9151B"), ("disabled", "#E7A1A4")], foreground=[("disabled", white)])
+        style.configure("Dark.TButton", font=("Segoe UI", 9, "bold"), padding=(13, 9), background=black, foreground=white)
+        style.map("Dark.TButton", background=[("active", "#333333"), ("disabled", "#777777")])
+        style.configure("Secondary.TButton", font=("Segoe UI", 9), padding=(10, 7), background="#F4F4F5", foreground=black)
+        style.map("Secondary.TButton", background=[("active", "#E4E4E7")])
+        style.configure("Treeview", rowheight=29, font=("Segoe UI", 9), background=white, fieldbackground=white, foreground=black)
+        style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"), background=black, foreground=white, padding=(8, 8), relief="flat")
+        style.map("Treeview.Heading", background=[("active", red)])
+        style.configure("Red.Horizontal.TProgressbar", troughcolor="#E5E5E5", background=red, bordercolor="#E5E5E5", lightcolor=red, darkcolor=red)
+        self.configure(bg=bg)
+
+        shell = tk.Frame(self, bg=bg)
+        shell.pack(fill="both", expand=True)
+        sidebar = tk.Frame(shell, bg=black, width=218)
+        sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
+        logo_path = Path(__file__).resolve().parent / "assets" / "brand_mark.png"
         try:
-            style.theme_use("clam")
-        except tk.TclError:
-            pass
-        style.configure("TFrame", background="#f3f5f8")
-        style.configure("Card.TLabelframe", background="#ffffff", borderwidth=1, relief="solid")
-        style.configure("Card.TLabelframe.Label", background="#ffffff", foreground="#1b2b43", font=("Segoe UI", 10, "bold"))
-        style.configure("TLabel", background="#f3f5f8", foreground="#26364a", font=("Segoe UI", 9))
-        style.configure("Title.TLabel", background="#f3f5f8", foreground="#172a43", font=("Segoe UI", 19, "bold"))
-        style.configure("Sub.TLabel", background="#f3f5f8", foreground="#5b6b7f", font=("Segoe UI", 9))
-        style.configure("Primary.TButton", font=("Segoe UI", 9, "bold"), padding=(13, 8))
-        style.configure("Treeview", rowheight=25, font=("Segoe UI", 9))
-        style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"))
+            self.brand_photo = tk.PhotoImage(file=str(logo_path))
+            self.iconphoto(True, self.brand_photo)
+            tk.Label(sidebar, image=self.brand_photo, bg=black, borderwidth=0).pack(anchor="w", padx=20, pady=(22, 10))
+        except (tk.TclError, OSError):
+            tk.Frame(sidebar, bg=red, width=52, height=5).pack(anchor="w", padx=20, pady=(34, 28))
+        tk.Label(sidebar, text="SMART DRIVE", bg=black, fg=white, font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=20)
+        tk.Label(sidebar, text="ORGANIZER", bg=black, fg="#F87171", font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=20, pady=(0, 22))
+        tk.Frame(sidebar, bg=red, height=3).pack(fill="x", padx=20, pady=(0, 20))
+        tk.Label(sidebar, text="WORKSPACE", bg=black, fg="#A3A3A3", font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=20, pady=(0, 8))
 
-        outer = ttk.Frame(self, padding=18)
-        outer.pack(fill="both", expand=True)
-        ttk.Label(outer, text="Smart Drive Organizer", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(outer, text="Collect related files by meaning, then separate each group by file extension.", style="Sub.TLabel").pack(anchor="w", pady=(2, 12))
+        def nav_button(label: str, command: Callable[[], None], accent: bool = False) -> None:
+            tk.Button(sidebar, text=label, command=command, anchor="w", padx=20, pady=11, relief="flat",
+                borderwidth=0, cursor="hand2", bg=red if accent else black, fg=white,
+                activebackground="#B9151B" if accent else "#262626", activeforeground=white,
+                font=("Segoe UI", 9, "bold" if accent else "normal"), highlightthickness=0).pack(fill="x", padx=10, pady=2)
 
-        locations = ttk.LabelFrame(outer, text="1. Choose source drives and destination", style="Card.TLabelframe", padding=12)
-        locations.pack(fill="x", pady=(0, 10))
+        nav_button("Overview", lambda: self._scroll_to_section("overview"))
+        nav_button("Locations", lambda: self._scroll_to_section("locations"))
+        nav_button("File formats", lambda: self._scroll_to_section("filetypes"))
+        nav_button("Topic groups & rules", lambda: self._scroll_to_section("selective"))
+        nav_button("Automation settings", self._open_automation_settings)
+        nav_button("Activity log", self._open_activity_log)
+        nav_button("GitHub publishing", self._open_github_publisher)
+        tk.Frame(sidebar, bg="#404040", height=1).pack(fill="x", padx=18, pady=(22, 14))
+        tk.Label(sidebar, text="PRIVATE BY DESIGN", bg=black, fg=white, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=20)
+        tk.Label(sidebar, text="Your files stay on this computer. Nothing changes until you review and confirm.",
+            bg=black, fg="#A3A3A3", justify="left", wraplength=172, font=("Segoe UI", 8)).pack(anchor="w", padx=20, pady=(6, 12))
+        tk.Label(sidebar, text=f"VERSION {__version__}", bg=black, fg="#737373", font=("Segoe UI", 8)).pack(side="bottom", anchor="w", padx=20, pady=18)
+
+        main = tk.Frame(shell, bg=bg)
+        main.pack(side="left", fill="both", expand=True)
+        topbar = tk.Frame(main, bg=white, height=72)
+        topbar.pack(fill="x")
+        topbar.pack_propagate(False)
+        top_left = tk.Frame(topbar, bg=white)
+        top_left.pack(side="left", fill="y", padx=24)
+        tk.Label(top_left, text="Smart Drive Organizer", bg=white, fg=black, font=("Segoe UI", 14, "bold")).pack(anchor="w", pady=(15, 0))
+        tk.Label(top_left, text="A safer, clearer way to organize your files", bg=white, fg=muted, font=("Segoe UI", 8)).pack(anchor="w", pady=(1, 0))
+        tk.Label(topbar, text="●  LOCAL-FIRST", bg="#FEE2E2", fg=red, font=("Segoe UI", 8, "bold"), padx=10, pady=7).pack(side="right", padx=24, pady=17)
+        tk.Frame(main, bg=red, height=3).pack(fill="x")
+
+        scroll_area = tk.Frame(main, bg=bg)
+        scroll_area.pack(fill="both", expand=True)
+        self.content_canvas = tk.Canvas(scroll_area, bg=bg, highlightthickness=0, borderwidth=0)
+        scrollbar = ttk.Scrollbar(scroll_area, orient="vertical", command=self.content_canvas.yview)
+        self.content_canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.content_canvas.pack(side="left", fill="both", expand=True)
+        content = ttk.Frame(self.content_canvas, style="Page.TFrame", padding=(24, 22, 24, 26))
+        self.content_frame = content
+        canvas_window = self.content_canvas.create_window((0, 0), window=content, anchor="nw")
+        content.bind("<Configure>", lambda _event: self.content_canvas.configure(scrollregion=self.content_canvas.bbox("all")))
+        self.content_canvas.bind("<Configure>", lambda event: self.content_canvas.itemconfigure(canvas_window, width=event.width))
+        self.content_canvas.bind("<Enter>", lambda _event: self.content_canvas.bind_all("<MouseWheel>", lambda event: self.content_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")))
+        self.content_canvas.bind("<Leave>", lambda _event: self.content_canvas.unbind_all("<MouseWheel>"))
+        self._scroll_targets = {"overview": content}
+
+        intro = ttk.Frame(content, style="Page.TFrame")
+        intro.pack(fill="x", pady=(0, 16))
+        ttk.Label(intro, text="Organize your drives", style="PageTitle.TLabel").pack(anchor="w")
+        ttk.Label(intro, text="Choose what to scan, preview the proposed folders, and apply only when satisfied.", style="PageSub.TLabel").pack(anchor="w", pady=(4, 0))
+
+        locations = ttk.LabelFrame(content, text="01   SOURCE LOCATIONS", style="Card.TLabelframe", padding=14)
+        locations.pack(fill="x", pady=(0, 12))
+        self._scroll_targets["locations"] = locations
         locations.columnconfigure(1, weight=1)
-        ttk.Label(locations, text="Source drives / folders").grid(row=0, column=0, sticky="nw", padx=(0, 10), pady=5)
-        source_frame = ttk.Frame(locations)
-        source_frame.grid(row=0, column=1, sticky="nsew", pady=5)
-        self.source_listbox = tk.Listbox(
-            source_frame, selectmode=tk.EXTENDED, exportselection=False, height=4,
-            font=("Segoe UI", 9), activestyle="dotbox", relief="solid", borderwidth=1,
-        )
+        ttk.Label(locations, text="Source drives / folders", style="Card.TLabel").grid(row=0, column=0, sticky="nw", padx=(0, 12), pady=5)
+        source_frame = ttk.Frame(locations, style="Card.TFrame")
+        source_frame.grid(row=0, column=1, sticky="nsew", pady=4)
+        self.source_listbox = tk.Listbox(source_frame, selectmode=tk.EXTENDED, exportselection=False, height=4,
+            font=("Segoe UI", 9), activestyle="dotbox", relief="flat", borderwidth=0, bg="#FAFAFA", fg=black,
+            selectbackground=red, selectforeground=white, highlightthickness=1, highlightbackground=border)
         self.source_listbox.pack(side="left", fill="both", expand=True)
         source_scroll = ttk.Scrollbar(source_frame, orient="vertical", command=self.source_listbox.yview)
         source_scroll.pack(side="right", fill="y")
         self.source_listbox.configure(yscrollcommand=source_scroll.set)
-        source_buttons = ttk.Frame(locations)
-        source_buttons.grid(row=0, column=2, sticky="ns", padx=(8, 0), pady=5)
-        ttk.Button(source_buttons, text="Refresh drives", command=self._refresh_drives).pack(fill="x", pady=(0, 4))
-        ttk.Button(source_buttons, text="Select all", command=self._select_all_sources).pack(fill="x", pady=2)
-        ttk.Button(source_buttons, text="Clear", command=self._clear_sources).pack(fill="x", pady=2)
-        ttk.Button(source_buttons, text="Add folder…", command=self._add_source_folder).pack(fill="x", pady=(4, 0))
-        ttk.Label(locations, text="Output / destination folder").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=5)
-        ttk.Entry(locations, textvariable=self.output_var).grid(row=1, column=1, sticky="ew", pady=5)
-        ttk.Button(locations, text="Browse…", command=self._browse_output).grid(row=1, column=2, padx=(8, 0), pady=5)
-        ttk.Label(
-            locations,
-            text="Choose multiple drives (for example C: and D:). Network drives are listed but not preselected. You may use a destination folder inside a selected drive: that output folder is excluded from scanning.",
-            style="Sub.TLabel", wraplength=980,
-        ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        source_buttons = ttk.Frame(locations, style="Card.TFrame")
+        source_buttons.grid(row=0, column=2, sticky="ns", padx=(10, 0), pady=4)
+        ttk.Button(source_buttons, text="Refresh drives", style="Secondary.TButton", command=self._refresh_drives).pack(fill="x", pady=(0, 4))
+        ttk.Button(source_buttons, text="Select all", style="Secondary.TButton", command=self._select_all_sources).pack(fill="x", pady=2)
+        ttk.Button(source_buttons, text="Clear", style="Secondary.TButton", command=self._clear_sources).pack(fill="x", pady=2)
+        ttk.Button(source_buttons, text="Add folder…", style="Secondary.TButton", command=self._add_source_folder).pack(fill="x", pady=(4, 0))
+        ttk.Label(locations, text="Output / destination folder", style="Card.TLabel").grid(row=1, column=0, sticky="w", padx=(0, 12), pady=8)
+        ttk.Entry(locations, textvariable=self.output_var).grid(row=1, column=1, sticky="ew", pady=8)
+        ttk.Button(locations, text="Browse…", style="Secondary.TButton", command=self._browse_output).grid(row=1, column=2, padx=(10, 0), pady=8)
+        ttk.Label(locations, text="Select one or more drives. The destination is excluded from scanning to prevent reprocessing.",
+            style="Muted.TLabel", wraplength=900).grid(row=2, column=0, columnspan=3, sticky="w", pady=(5, 0))
 
-        options = ttk.Frame(outer)
-        options.pack(fill="x", pady=(0, 10))
-        filetypes = ttk.LabelFrame(options, text="2. File types to organize", style="Card.TLabelframe", padding=10)
-        filetypes.pack(side="left", fill="both", expand=True, padx=(0, 8))
+        options = ttk.Frame(content, style="Page.TFrame")
+        options.pack(fill="x", pady=(0, 12))
+        options.columnconfigure(0, weight=3)
+        options.columnconfigure(1, weight=2)
+        filetypes = ttk.LabelFrame(options, text="02   FILE FORMATS", style="Card.TLabelframe", padding=13)
+        filetypes.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        self._scroll_targets["filetypes"] = filetypes
+        filetypes.columnconfigure(0, weight=1)
+        filetypes.columnconfigure(1, weight=1)
         for index, category in enumerate(CATEGORIES):
-            row, col = divmod(index, 5)
-            ttk.Checkbutton(filetypes, text=category, variable=self.category_vars[category]).grid(row=row, column=col, sticky="w", padx=(0, 12), pady=3)
-        type_buttons = ttk.Frame(filetypes)
-        type_buttons.grid(row=2, column=0, columnspan=5, sticky="w", pady=(5, 0))
-        ttk.Button(type_buttons, text="Select all", command=lambda: self._select_categories(True)).pack(side="left")
-        ttk.Button(type_buttons, text="Clear", command=lambda: self._select_categories(False)).pack(side="left", padx=(6, 0))
-        ttk.Button(type_buttons, text="Choose formats…", command=self._choose_file_formats).pack(side="left", padx=(6, 0))
-        ttk.Label(filetypes, textvariable=self.file_format_summary_var, style="Sub.TLabel").grid(row=3, column=0, columnspan=5, sticky="w", pady=(5, 0))
+            row, col = divmod(index, 2)
+            ttk.Checkbutton(filetypes, text=category, variable=self.category_vars[category], style="Card.TCheckbutton").grid(row=row, column=col, sticky="w", padx=(0, 12), pady=4)
+        type_buttons = ttk.Frame(filetypes, style="Card.TFrame")
+        type_buttons.grid(row=5, column=0, columnspan=2, sticky="w", pady=(9, 2))
+        ttk.Button(type_buttons, text="Select all", style="Secondary.TButton", command=lambda: self._select_categories(True)).pack(side="left")
+        ttk.Button(type_buttons, text="Clear", style="Secondary.TButton", command=lambda: self._select_categories(False)).pack(side="left", padx=(6, 0))
+        ttk.Button(type_buttons, text="Choose formats…", style="Dark.TButton", command=self._choose_file_formats).pack(side="left", padx=(6, 0))
+        ttk.Label(filetypes, textvariable=self.file_format_summary_var, style="Muted.TLabel", wraplength=480).grid(row=6, column=0, columnspan=2, sticky="w", pady=(7, 0))
 
-        action = ttk.LabelFrame(options, text="3. How to organize", style="Card.TLabelframe", padding=10)
-        action.pack(side="left", fill="y", padx=(8, 0))
-        ttk.Radiobutton(action, text="Copy files (safest first run)", variable=self.mode_var, value="copy").pack(anchor="w", pady=3)
-        ttk.Radiobutton(action, text="Move files", variable=self.mode_var, value="move").pack(anchor="w", pady=3)
-        ttk.Separator(action).pack(fill="x", pady=7)
-        ttk.Checkbutton(action, text="Include subfolders", variable=self.recursive_var).pack(anchor="w", pady=3)
-        ttk.Checkbutton(action, text="Read document text where possible", variable=self.content_var).pack(anchor="w", pady=3)
-        ttk.Button(action, text="Add keyword rule…", command=self._add_rule).pack(anchor="w", pady=(8, 0))
+        action = ttk.LabelFrame(options, text="03   ORGANIZATION OPTIONS", style="Card.TLabelframe", padding=13)
+        action.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        ttk.Radiobutton(action, text="Copy files — safest first run", variable=self.mode_var, value="copy", style="Card.TRadiobutton").pack(anchor="w", pady=5)
+        ttk.Radiobutton(action, text="Move files", variable=self.mode_var, value="move", style="Card.TRadiobutton").pack(anchor="w", pady=5)
+        ttk.Separator(action).pack(fill="x", pady=8)
+        ttk.Checkbutton(action, text="Include subfolders", variable=self.recursive_var, style="Card.TCheckbutton").pack(anchor="w", pady=4)
+        ttk.Checkbutton(action, text="Read document text where possible", variable=self.content_var, style="Card.TCheckbutton").pack(anchor="w", pady=4)
+        ttk.Button(action, text="Add keyword rule…", style="Secondary.TButton", command=self._add_rule).pack(anchor="w", pady=(9, 0))
 
-        selective = ttk.LabelFrame(outer, text="Optional: organize only the topic groups you select", style="Card.TLabelframe", padding=9)
-        selective.pack(fill="x", pady=(0, 8))
-        ttk.Checkbutton(
-            selective,
-            text="Only organize files matching the selected topic groups; leave all other files untouched",
-            variable=self.topic_filter_var,
-        ).pack(anchor="w")
-        self.topic_options_frame = ttk.Frame(selective)
-        self.topic_options_frame.pack(anchor="w", pady=(4, 0), fill="x")
+        selective = ttk.LabelFrame(content, text="04   SELECTIVE TOPIC GROUPS", style="Card.TLabelframe", padding=13)
+        selective.pack(fill="x", pady=(0, 12))
+        self._scroll_targets["selective"] = selective
+        ttk.Checkbutton(selective, text="Only organize files matching the topic groups I select. Leave all other files untouched.",
+            variable=self.topic_filter_var, style="Card.TCheckbutton").pack(anchor="w")
+        self.topic_options_frame = ttk.Frame(selective, style="Card.TFrame")
+        self.topic_options_frame.pack(anchor="w", pady=(8, 0), fill="x")
         self._refresh_topic_options()
-        ttk.Button(selective, text="Add / manage my own topic groups…", command=self._manage_topic_groups).pack(anchor="w", pady=(6, 0))
-        ttk.Label(
-            selective,
-            text="Create a folder label and enter matching words or phrases. Filename matching works for all selected file types; supported document text can also be searched when enabled.",
-            style="Sub.TLabel", wraplength=980,
-        ).pack(anchor="w", pady=(5, 0))
+        ttk.Button(selective, text="Add / manage topic groups…", style="Secondary.TButton", command=self._manage_topic_groups).pack(anchor="w", pady=(9, 0))
+        ttk.Label(selective, text="Create destination folder names and matching keywords. Supported document text can also be searched.",
+            style="Muted.TLabel", wraplength=900).pack(anchor="w", pady=(7, 0))
 
-        controls = ttk.Frame(outer)
-        controls.pack(fill="x", pady=(0, 8))
-        self.scan_button = ttk.Button(controls, text="Scan and preview", style="Primary.TButton", command=self._scan)
+        controls = ttk.Frame(content, style="Page.TFrame")
+        controls.pack(fill="x", pady=(0, 12))
+        self.scan_button = ttk.Button(controls, text="SCAN & PREVIEW", style="Primary.TButton", command=self._scan)
         self.scan_button.pack(side="left")
-        self.apply_button = ttk.Button(controls, text="Apply organization", style="Primary.TButton", command=self._apply, state="disabled")
-        self.apply_button.pack(side="left", padx=8)
-        self.undo_button = ttk.Button(controls, text="Undo last move", command=self._undo)
-        self.undo_button.pack(side="left")
-        ttk.Button(controls, text="Undo last automatic move", command=self._undo_auto_move).pack(side="left", padx=(6, 0))
-        ttk.Button(controls, text="Automation settings…", command=self._open_automation_settings).pack(side="left", padx=(8, 0))
-        self.automation_button = ttk.Button(controls, text="Start monitor", command=self._toggle_automation)
-        self.automation_button.pack(side="left", padx=8)
-        ttk.Button(controls, text="Open output folder", command=self._open_output).pack(side="right")
-        ttk.Button(controls, text="Activity log", command=self._open_activity_log).pack(side="right", padx=(0, 8))
-        ttk.Button(controls, text="Publish rules to GitHub…", command=self._open_github_publisher).pack(side="right", padx=(0, 8))
+        self.apply_button = ttk.Button(controls, text="APPLY ORGANIZATION", style="Dark.TButton", command=self._apply, state="disabled")
+        self.apply_button.pack(side="left", padx=(8, 0))
+        self.undo_button = ttk.Button(controls, text="Undo last move", style="Secondary.TButton", command=self._undo)
+        self.undo_button.pack(side="left", padx=(8, 0))
+        ttk.Button(controls, text="Undo automatic move", style="Secondary.TButton", command=self._undo_auto_move).pack(side="left", padx=(6, 0))
+        self.automation_button = ttk.Button(controls, text="Start monitor", style="Secondary.TButton", command=self._toggle_automation)
+        self.automation_button.pack(side="left", padx=(8, 0))
+        ttk.Button(controls, text="Open destination", style="Secondary.TButton", command=self._open_output).pack(side="right")
 
-        preview = ttk.LabelFrame(outer, text="4. Preview — nothing changes until you apply", style="Card.TLabelframe", padding=8)
-        preview.pack(fill="both", expand=True)
+        preview = ttk.LabelFrame(content, text="05   REVIEW PLAN — NOTHING CHANGES UNTIL YOU APPLY", style="Card.TLabelframe", padding=10)
+        preview.pack(fill="both", expand=True, pady=(0, 10))
         columns = ("file", "category", "group", "extension", "confidence", "destination")
-        self.table = ttk.Treeview(preview, columns=columns, show="headings", height=14)
-        headings = {"file": "File", "category": "Type", "group": "Keyword group", "extension": "Extension", "confidence": "Match", "destination": "Planned destination"}
-        widths = {"file": 170, "category": 95, "group": 160, "extension": 82, "confidence": 75, "destination": 420}
+        self.table = ttk.Treeview(preview, columns=columns, show="headings", height=12)
+        headings = {"file":"File", "category":"Type", "group":"Keyword group", "extension":"Extension", "confidence":"Match", "destination":"Planned destination"}
+        widths = {"file":180, "category":90, "group":155, "extension":80, "confidence":75, "destination":420}
         for column in columns:
             self.table.heading(column, text=headings[column])
-            self.table.column(column, width=widths[column], minwidth=60, stretch=(column == "destination"))
+            self.table.column(column, width=widths[column], minwidth=58, stretch=(column == "destination"))
         yscroll = ttk.Scrollbar(preview, orient="vertical", command=self.table.yview)
         xscroll = ttk.Scrollbar(preview, orient="horizontal", command=self.table.xview)
         self.table.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
@@ -211,13 +287,23 @@ class OrganizerApp(tk.Tk):
         preview.rowconfigure(0, weight=1)
         preview.columnconfigure(0, weight=1)
 
-        ttk.Label(outer, textvariable=self.summary_var).pack(anchor="w", pady=(8, 2))
-        self.progress = ttk.Progressbar(outer, variable=self.progress_var, maximum=100, mode="indeterminate")
-        self.progress.pack(fill="x", pady=(0, 5))
-        ttk.Label(outer, textvariable=self.status_var, style="Sub.TLabel").pack(anchor="w")
-        ttk.Label(outer, textvariable=self.automation_status_var, style="Sub.TLabel").pack(anchor="w", pady=(2, 0))
+        footer = ttk.Frame(content, style="Page.TFrame")
+        footer.pack(fill="x")
+        ttk.Label(footer, textvariable=self.summary_var, style="PageSub.TLabel").pack(anchor="w", pady=(2, 7))
+        self.progress = ttk.Progressbar(footer, variable=self.progress_var, maximum=100, mode="indeterminate", style="Red.Horizontal.TProgressbar")
+        self.progress.pack(fill="x", pady=(0, 7))
+        ttk.Label(footer, textvariable=self.status_var, style="PageSub.TLabel", wraplength=950).pack(anchor="w")
+        ttk.Label(footer, textvariable=self.automation_status_var, style="PageSub.TLabel", wraplength=950).pack(anchor="w", pady=(4, 0))
         self._refresh_drives(select_defaults=True)
         self.after(1000, self._refresh_automation_status)
+
+    def _scroll_to_section(self, section: str) -> None:
+        target = self._scroll_targets.get(section)
+        if target is None:
+            return
+        self.update_idletasks()
+        total = max(1, self.content_frame.winfo_height())
+        self.content_canvas.yview_moveto(max(0.0, min(1.0, target.winfo_y() / total)))
 
     def _open_automation_settings(self) -> None:
         AutomationSettingsDialog(self, self._refresh_automation_status)
