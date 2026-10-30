@@ -252,7 +252,7 @@ def latest_movable_journal(output_root: Path, origin: Optional[str] = None) -> O
     return max(candidates, key=lambda p: p.stat().st_mtime) if candidates else None
 
 
-def undo_move_journal(journal_path: Path, progress: Optional[Callable[[str], None]] = None) -> Dict:
+def undo_move_journal(journal_path: Path, progress: Optional[Callable[[object], None]] = None, control: Optional[OperationControl] = None) -> Dict:
     """Restore moved files to their original paths; never overwrites an existing original."""
     journal = json.loads(journal_path.read_text(encoding="utf-8"))
     if journal.get("mode") != "move":
@@ -260,8 +260,15 @@ def undo_move_journal(journal_path: Path, progress: Optional[Callable[[str], Non
     restored = 0
     skipped = 0
     errors: List[str] = []
+    cancelled = False
 
     for action in reversed(journal.get("actions", [])):
+        if control is not None:
+            try:
+                control.checkpoint()
+            except OperationCancelled:
+                cancelled = True
+                break
         state = action.get("status")
         if state not in {"moved", "in_progress"}:
             continue
@@ -293,7 +300,7 @@ def undo_move_journal(journal_path: Path, progress: Optional[Callable[[str], Non
                 errors.append(f"Original path is occupied; left organized file in place: {original}")
                 continue
             original.parent.mkdir(parents=True, exist_ok=True)
-            restored_path, detail = _move_file(source_now, original, allow_rename=False)
+            restored_path, detail = _move_file(source_now, original, allow_rename=False, control=control)
             if restored_path != original:
                 raise IOError("The file could not be restored to its exact original path.")
             if source_now.exists():
@@ -306,15 +313,20 @@ def undo_move_journal(journal_path: Path, progress: Optional[Callable[[str], Non
                 action["status"] = "undone"
                 action["undone_at"] = _timestamp()
                 restored += 1
+        except OperationCancelled:
+            cancelled = True
+            action["status"] = "cancelled"
+            _write_json_atomic(journal_path, journal)
+            break
         except Exception as error:
             skipped += 1
             errors.append(f"Could not restore {source_now}: {error}")
         if progress:
-            progress(f"Restored {restored:,} file(s); skipped {skipped:,}.")
+            progress({"phase": "undo", "restored": restored, "skipped": skipped, "cancelled": cancelled})
         _write_json_atomic(journal_path, journal)
 
     journal["undo_finished_at"] = _timestamp()
-    journal["undo_summary"] = {"restored": restored, "skipped": skipped, "errors": errors}
-    journal["status"] = "undone" if skipped == 0 else "undo_partial"
+    journal["undo_summary"] = {"restored": restored, "skipped": skipped, "errors": errors, "cancelled": cancelled}
+    journal["status"] = "cancelled" if cancelled else ("undone" if skipped == 0 else "undo_partial")
     _write_json_atomic(journal_path, journal)
-    return {"restored": restored, "skipped": skipped, "errors": errors}
+    return {"restored": restored, "skipped": skipped, "errors": errors, "cancelled": cancelled}
