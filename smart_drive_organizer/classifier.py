@@ -14,7 +14,7 @@ def _add(category: str, extensions: str) -> None:
         EXTENSION_CATEGORIES[ext.lower()] = category
 
 
-_add("Documents", ".pdf .doc .docx .odt .rtf .txt .md .csv .tsv .xls .xlsx .xlsm .ods .ppt .pptx .odp .json .xml .html .htm .yaml .yml .log .tex .epub")
+_add("Documents", ".pdf .doc .docx .odt .rtf .txt .md .csv .tsv .xls .xlsx .xlsm .ods .ppt .pptx .odp .json .xml .html .htm .yaml .yml .log .tex .epub .eml .msg")
 _add("Images", ".jpg .jpeg .png .gif .bmp .tif .tiff .webp .heic .heif .svg .raw .cr2 .nef .arw .dng .ico .psd .ai .eps")
 _add("Videos", ".mp4 .m4v .mov .avi .mkv .wmv .webm .mpeg .mpg .3gp .mts .m2ts .ts .flv .vob")
 _add("Audio", ".mp3 .wav .flac .aac .m4a .ogg .oga .opus .wma .aiff .aif .alac .ape .mid .midi")
