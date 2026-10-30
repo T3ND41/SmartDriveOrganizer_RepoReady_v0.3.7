@@ -110,5 +110,20 @@ class SearchIndexTests(unittest.TestCase):
             self.assertTrue(matches[0]["body"])
 
 
+    def test_topic_refresh_keeps_existing_extracted_text(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            item = root / "Quarterly Review.txt"
+            item.write_text("retained body text for a later search", encoding="utf-8")
+            index = SearchIndex(root / "index.sqlite3")
+            index.upsert_file(item, "Documents", "retained body text for a later search", "Unclassified Documents", text_indexed=True)
+            index.update_topic(item, "Quarterly Reports")
+            rows = index.search(query="retained body", topic="Quarterly Reports")
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["body"], "retained body text for a later search")
+            self.assertTrue(rows[0]["text_indexed"])
+            index.close()
+
+
 if __name__ == "__main__":
     unittest.main()
