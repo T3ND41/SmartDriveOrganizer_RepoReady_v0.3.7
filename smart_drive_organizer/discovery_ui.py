@@ -54,6 +54,7 @@ class DiscoveryReviewDialog(tk.Toplevel):
         ttk.Button(actions,text="Select all",command=lambda:self.tree.selection_set(tuple(str(i) for i in range(len(groups))))).pack(side="left")
         ttk.Button(actions,text="Clear",command=lambda:self.tree.selection_remove(self.tree.selection())).pack(side="left",padx=5)
         ttk.Button(actions,text="Cancel",command=self.destroy).pack(side="right")
+        ttk.Button(actions,text="Remember rejection",command=self._reject).pack(side="right",padx=(0,6))
         ttk.Button(actions,text="Approve selected & rescan",style="Primary.TButton",command=self._approve).pack(side="right",padx=(0,8))
         if groups: self.tree.selection_set("0"); self._changed()
 
@@ -84,6 +85,14 @@ class DiscoveryReviewDialog(tk.Toplevel):
         ids=self._ids()
         if not ids:
             messagebox.showinfo("No selection","Select at least one suggested group.",parent=self); return
-        self.result=[{"name":self.names[i],"phrase":self.groups[i].phrase,
-            "category":self.groups[i].category,"file_count":self.groups[i].file_count} for i in ids]
+        self.result={"decision":"approved","groups":[{"name":self.names[i],"phrase":self.groups[i].phrase,
+            "category":self.groups[i].category,"file_count":self.groups[i].file_count} for i in ids]}
+        self.destroy()
+
+    def _reject(self):
+        ids=self._ids()
+        if not ids:
+            messagebox.showinfo("No selection","Select one or more suggestions to remember as rejected.",parent=self); return
+        self.result={"decision":"rejected","groups":[{"name":self.names[i],"phrase":self.groups[i].phrase,
+            "category":self.groups[i].category,"file_count":self.groups[i].file_count} for i in ids]}
         self.destroy()
