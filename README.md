@@ -1,14 +1,14 @@
-# Smart Drive Organizer — v0.4.0
+# Smart Drive Organizer — v0.5.0
 
-**Branded desktop interface with selectable file extensions for manual and automatic organization**
+**Safe deep search, recurring-pattern discovery, reviewable grouping and persistent rules**
 
 A local-first Windows file organizer with a redesigned desktop workspace, custom keyword routing, multi-drive scanning, persistent rules and optional background monitoring.
 
 **Brand system:** black `#101010`, red `#D71920`, and white `#FFFFFF`. The supplied monochrome face-and-skull artwork is the application mark.
 
-## One-line PowerShell installation
+## Optional conventional installer
 
-After the first Windows release is published, run:
+The no-install PowerShell launcher is recommended. The conventional per-user installer is still available separately:
 
 ```powershell
 irm https://raw.githubusercontent.com/T3ND41/SmartDriveOrganizer_RepoReady_v0.3.7/main/install.ps1 | iex
@@ -23,6 +23,22 @@ The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, 
 - Added a black navigation rail, white workspace cards, red primary actions and a consistent typography and spacing system.
 - Added the supplied monochrome artwork as the application mark and window icon.
 - Grouped locations, file formats, organization preferences, topic rules and preview into a scrollable workflow. Existing file operations and safety confirmations remain connected.
+
+## Safe deep search and automatic discovery (v0.5.0)
+
+- The first scan searches recursively through the selected local fixed/removable drives and mounted volumes. The default selection now includes all supported file families and file extensions; network drives remain opt-in.
+- The search is read-only. It records accessible file names, paths, categories and file metadata. It never moves, copies, renames or deletes anything during discovery.
+- The scanner identifies repeated filename words and phrases across **at least two different files**. Repeated words inside one file do not count as multiple matches.
+- Existing built-in and saved keywords are not suggested again as new discoveries. Candidate groups are separated by file family and include a match count, sample names and original locations.
+- A review window lets you select, reject or rename proposed groups. Only groups you approve are saved as reusable local rules. The app then rescans and builds a fresh preview using those rules.
+- The final scan preview still controls what will be organized. Nothing is copied or moved until you click **Apply organization** and confirm.
+- Approved patterns are saved locally and can be reused in later scans. They are also made available to the background organizer, subject to its own selected categories and selective-topic settings.
+
+### Safe search boundaries
+
+To protect Windows, installed applications and development environments, the scanner deliberately skips Windows and recovery directories, Program Files, ProgramData, AppData, recycle-bin/system-volume folders, protected operating-system files, project roots and common dependency/cache folders. It also avoids following symbolic links, junctions and other reparse points. Inaccessible folders are reported as warnings rather than forced open. Network locations are not selected automatically.
+
+This is an intentionally safe deep search of accessible personal/work files on the selected volumes, **not a byte-for-byte search of every protected operating-system location**. Some user data stored inside excluded locations such as AppData will therefore not appear. No scan can promise access to every file on a machine, because permissions, encryption, offline drives and damaged media can prevent access.
 
 ## Features
 
@@ -70,15 +86,15 @@ Run tests with `python -m unittest discover -s tests -v`.
 
 ## CI and Windows releases
 
-Pushes to `main` run tests on Windows and Linux. Pushing a version tag such as `v0.3.7` runs the Windows release workflow, which tests the project, builds the executable, packages it, calculates SHA-256 and publishes a GitHub Release.
+Pushes to `main` run tests on Windows and Linux. Pushing a version tag such as `v0.5.0` runs the Windows release workflow, which tests the project, builds the executable, packages it, calculates SHA-256 and publishes a GitHub Release.
 
 ## Safety
 
 - Copy is recommended for first use.
 - Existing destination files are never overwritten.
 - Unknown or unmatched files are not automatically routed by selective rules.
-- Protected or inaccessible locations may be skipped.
-- Keep backups before large Move operations.
+- Protected operating-system/application locations, links, inaccessible folders and unsupported file contents may be skipped; check the scan warnings and coverage summary.
+- Start with Copy and inspect discovered groups and the complete preview before applying; keep backups before large Move operations.
 - Background monitoring runs only while Windows is awake and the signed-in user session is active.
 
 ## Optional short domain
