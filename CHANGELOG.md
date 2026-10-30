@@ -1,3 +1,15 @@
+## 0.5.0 — Safe deep search and automatic discovery
+
+- Changed the default scan scope to include all supported file families and extensions across selected local fixed/removable drives and mounted volumes.
+- Added read-only repeated-pattern discovery from filenames during recursive scans, including combined discovery across multiple selected drives.
+- Requires a pattern to occur in at least two distinct files; repeated words inside one filename do not inflate the match count.
+- Filters out built-in and already-saved keywords, separates suggestions by file category, and supplies sample file names and original locations.
+- Added a review dialog where users can select, rename or reject suggested groups before any rule is saved.
+- Saves only user-approved patterns as persistent local classifier rules, then rescans to create a new organization preview.
+- Keeps discovery separate from file operations: scanning and suggesting groups do not copy, move, rename or delete source files.
+- Added regression tests for acronym and multiword discovery, single-file rejection, known-rule filtering, file-category separation, selective mode discovery and protected-directory exclusions.
+- Clarified safe scan boundaries: Windows, Program Files, ProgramData, AppData, recovery/system areas, recycle bins, links/reparse points, project roots and common dependency folders are excluded; network drives remain opt-in.
+
 ## Launcher — run without installing
 
 - Added a one-line PowerShell launcher that fetches the latest stable Windows release, verifies its SHA-256 manifest, extracts into a per-user runtime cache and starts the executable directly.
