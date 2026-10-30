@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import email
 import re
 import zipfile
 from email import policy
@@ -140,7 +139,9 @@ def read_document_text(path: Path) -> str:
     """Extract bounded searchable text locally; unsupported/locked formats return empty text."""
     suffix = path.suffix.lower()
     try:
-        if suffix in {".txt", ".md", ".csv", ".tsv", ".json", ".xml", ".html", ".htm", ".log", ".yaml", ".yml", ".sql", ".tex", ".py", ".js", ".ts", ".css", ".ps1", ".bat", ".cmd"}:
+        if path.stat().st_size > MAX_READ_BYTES:
+            return ""
+        if suffix in {".txt", ".md", ".csv", ".tsv", ".json", ".xml", ".html", ".htm", ".log", ".yaml", ".yml", ".sql", ".tex", ".py", ".js", ".ts", ".jsx", ".tsx", ".css", ".scss", ".java", ".c", ".cpp", ".h", ".hpp", ".cs", ".go", ".rs", ".php", ".rb", ".sh", ".ps1", ".bat", ".cmd", ".sql", ".toml", ".ini", ".yaml", ".yml"}:
             text = _plain_text(path)
             if suffix in {".html", ".htm", ".xml"}:
                 text = re.sub(r"<[^>]+>", " ", text)
@@ -160,7 +161,7 @@ def read_document_text(path: Path) -> str:
             return _eml_text(path)
         if suffix == ".msg":
             return _msg_text(path)
-    except (ImportError, OSError, ValueError, KeyError, zipfile.BadZipFile, RuntimeError, email.errors.MessageError):
+    except (ImportError, OSError, ValueError, KeyError, zipfile.BadZipFile, RuntimeError):
         return ""
     except Exception:
         # Parsers are deliberately best-effort. Bad/corrupt files remain listed
