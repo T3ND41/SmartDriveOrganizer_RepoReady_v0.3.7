@@ -1,4 +1,5 @@
-# Optional local document readers. The core program runs without these packages.
+# Optional local document readers. Core program runs without these packages.
 pypdf>=5.0.0
 openpyxl>=3.1.0
 python-pptx>=1.0.0
+extract-msg>=0.48
