@@ -60,5 +60,23 @@ class DuplicateDetectionTests(unittest.TestCase):
             self.assertTrue(second.is_file())
 
 
+    def test_groups_plain_base_filename_with_explicit_version_variant(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            first, second = root / "Service Contract.pdf", root / "Service Contract v2.pdf"
+            first.write_bytes(b"base contract")
+            second.write_bytes(b"revised contract")
+            database = root / "index.sqlite3"
+            index = SearchIndex(database)
+            index.upsert_file(first, "Documents", "base contract")
+            index.upsert_file(second, "Documents", "revised contract")
+            index.close()
+            result = analyze_duplicates(database)
+            self.assertEqual(len(result["versions"]), 1)
+            self.assertEqual(result["versions"][0]["count"], 2)
+            self.assertEqual({item["name"] for item in result["versions"][0]["files"]},
+                             {"Service Contract.pdf", "Service Contract v2.pdf"})
+
+
 if __name__ == "__main__":
     unittest.main()
