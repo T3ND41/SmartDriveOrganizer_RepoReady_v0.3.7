@@ -198,7 +198,8 @@ class SearchDashboardDialog(tk.Toplevel):
         ttk.Button(actions, text="Show in folder", command=self._reveal).pack(side="left", padx=6)
         self.index_count_var = tk.StringVar(value="Local index")
         ttk.Label(actions, textvariable=self.index_count_var, style="Hint.TLabel").pack(side="right")
-        self.after(100, self._poll)
+        self.protocol("WM_DELETE_WINDOW", self._close)
+        self._after_id = self.after(100, self._poll)
         self.query_entry.focus_set()
         self._refresh_count()
 
@@ -206,6 +207,13 @@ class SearchDashboardDialog(tk.Toplevel):
     def _field(parent, label: str, variable: tk.StringVar, row: int, col: int) -> None:
         ttk.Label(parent, text=label).grid(row=row, column=col, sticky="w", padx=5)
         ttk.Entry(parent, textvariable=variable).grid(row=row+1, column=col, sticky="ew", padx=5, pady=(0, 5))
+
+    def _close(self) -> None:
+        try:
+            self.after_cancel(self._after_id)
+        except (AttributeError, tk.TclError):
+            pass
+        self.destroy()
 
     def _refresh_count(self) -> None:
         try:
@@ -310,4 +318,4 @@ class SearchDashboardDialog(tk.Toplevel):
                         self.status_var.set("Duplicate review completed. No files were changed.")
         except queue.Empty:
             pass
-        self.after(120, self._poll)
+        self._after_id = self.after(120, self._poll)
