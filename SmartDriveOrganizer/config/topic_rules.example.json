@@ -1,0 +1,16 @@
+[
+  {
+    "name": "My Quotations",
+    "keywords": ["QUO", "quotation number", "supplier quote"],
+    "categories": ["Documents"],
+    "match_mode": "contains",
+    "destination": "D:/Company Records/Quotations"
+  },
+  {
+    "name": "Site Photographs",
+    "keywords": ["site photo", "site photograph", "worksite picture", "inspection photograph"],
+    "categories": ["Images"],
+    "match_mode": "whole_phrase",
+    "destination": "D:/Company Records/Site Photographs"
+  }
+]

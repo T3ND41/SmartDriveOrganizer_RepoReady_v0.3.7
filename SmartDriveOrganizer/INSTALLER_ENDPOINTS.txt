@@ -1,0 +1,13 @@
+SMART DRIVE ORGANIZER — INSTALLER ENDPOINTS
+
+DIRECT COMMAND (after the public GitHub repository and first release are published):
+irm https://raw.githubusercontent.com/T3ND41/SmartDriveOrganizer/main/install.ps1 | iex
+
+CUSTOM DOMAIN COMMAND (only after Cloudflare Worker deployment and DNS configuration):
+irm https://smart.drive.win | iex
+
+The installer fetches the latest Windows release automatically, verifies the SHA-256 manifest, installs the EXE per-user, creates a Start Menu shortcut, and launches the program. You do not need to manually download or extract the ZIP. The installer still downloads the release in the background to install the application.
+
+The custom domain smart.drive.win is a subdomain of drive.win. It requires permission to manage the parent drive.win DNS zone. Until that is configured, use the direct GitHub Raw URL.
+
+WARNING: irm | iex runs remote PowerShell code in the current session. Inspect install.ps1 in the repository before running it.
