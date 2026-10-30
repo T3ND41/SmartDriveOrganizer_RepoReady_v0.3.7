@@ -1,3 +1,9 @@
+## Launcher — run without installing
+
+- Added a one-line PowerShell launcher that fetches the latest stable Windows release, verifies its SHA-256 manifest, extracts into a per-user runtime cache and starts the executable directly.
+- The launcher does not run the conventional installer, create shortcuts, set startup entries or require administrator rights.
+- Reuses the cached runtime when the latest version is already downloaded; organizer settings remain in the normal per-user data folder.
+
 ## 0.4.0 — Branded desktop UI/UX
 
 - Refreshed the desktop workspace with a black navigation rail, white content cards and red action accents.

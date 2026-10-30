@@ -43,6 +43,20 @@ The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, 
 
 After selecting broad file families, click **Choose file formats…**. For each selected family, choose **All supported formats** or **Only the formats I select below**. The Documents common list starts with PDF, DOCX, XLSX, XLS, CSV, PPTX, DOC, TXT, PPT and RTF. Additional and specialist formats follow. Selections are saved locally and enforced before classification and organization in both manual and automatic modes.
 
+## Run without installing
+
+Open PowerShell and paste this single line:
+
+```powershell
+irm https://raw.githubusercontent.com/T3ND41/SmartDriveOrganizer_RepoReady_v0.3.7/main/run.ps1 | iex
+```
+
+The launcher checks the latest stable GitHub Release, downloads the Windows ZIP and SHA-256 manifest, verifies the ZIP before extraction, caches the executable under `%LOCALAPPDATA%\\SmartDriveOrganizer\\PortableRuntime`, and starts it directly. It does not create a Start Menu shortcut, add a Windows startup entry, write installation registry keys, or require administrator rights or Python. It reuses the cached executable when the latest version is already present. Your application settings remain in the separate per-user `%LOCALAPPDATA%\\SmartDriveOrganizer` data folder.
+
+To remove the downloaded runtime, delete `%LOCALAPPDATA%\\SmartDriveOrganizer\\PortableRuntime`. This does not delete your saved organizer settings and activity data.
+
+**Security:** this one-line command executes a PowerShell script from the public repository. Review [run.ps1](run.ps1) before running it. The launcher verifies the downloaded release ZIP against the SHA-256 manifest published alongside it.
+
 ## Run from source
 
 Requires Python 3.10 or later.
