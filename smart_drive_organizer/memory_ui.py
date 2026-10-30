@@ -67,9 +67,10 @@ class LearningMemoryDialog(tk.Toplevel):
             f"Rejected patterns: {summary['rejected_groups']}    "
             f"Filing corrections: {summary['filing_corrections']}"
         )
+        source_keys = {"approved": "approved_groups", "rejected": "rejected_groups", "filing_corrections": "filing_corrections"}
         for key, tree in self.views.items():
             for child in tree.get_children(): tree.delete(child)
-            for i, item in enumerate(memory.get(key, [])):
+            for i, item in enumerate(memory.get(source_keys[key], [])):
                 if key == "filing_corrections":
                     values = (item.get("topic", ""), item.get("phrase", ""), item.get("category", ""), item.get("destination", ""))
                 else:
