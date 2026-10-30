@@ -143,7 +143,7 @@ class SearchIndex:
             if not ext.startswith("."): ext = "." + ext
             clauses.append("extension=?"); params.append(ext)
         if topic.strip():
-            clauses.append("topic LIKE ?"); params.append("%" + topic.strip() + "%")
+            clauses.append("indexed_files.topic LIKE ?"); params.append("%" + topic.strip() + "%")
         if date_from.strip():
             clauses.append("modified_ts>=?")
             params.append(time.mktime(time.strptime(date_from.strip(), "%Y-%m-%d")))
