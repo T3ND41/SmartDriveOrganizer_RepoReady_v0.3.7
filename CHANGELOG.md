@@ -1,3 +1,17 @@
+## 0.6.0 — Local search, adaptive memory and duplicate intelligence
+
+- Added bounded local text extraction for PDF text layers, DOCX, XLSX/XLSM, PPTX, EML, Outlook MSG, common text/code formats, CSV/TSV, HTML/XML and RTF.
+- Added a local SQLite/FTS5 index for file metadata and extracted text; unchanged files are not re-indexed when size and modified time match.
+- Added a Google-style search dashboard with filename/content search, location, file family, extension, topic, modified-date and size filters, plus Open and Show in folder actions.
+- Added a read-only index builder for selected drives and folders; protected OS/application/project folders remain excluded.
+- Added adaptive local memory for approved and rejected discoveries, renamed groups and filing corrections. Rejected patterns are suppressed on later scans and can be reinstated from Learning Memory.
+- Added a Teach selected file action so the user can save a preferred topic and matching wording from the scan preview.
+- Added a local memory review screen for inspecting approvals, rejections and correction history.
+- Added duplicate/version inspection: SHA-256 exact copies, possible filename revisions and high text-overlap candidates. The feature never deletes, moves, overwrites or merges files.
+- Added tests for content extraction, local full-text search, index caching and protected exclusions, learning memory persistence, and duplicate/version detection.
+- Added optional Outlook MSG parsing to the content extra and Windows executable packaging.
+- Documented limits: legacy binary DOC/XLS/PPT content extraction, OCR for image-only PDFs, and inaccessible/protected system locations are not supported by this release.
+
 ## 0.5.0 — Safe deep search and automatic discovery
 
 - Changed the default scan scope to include all supported file families and extensions across selected local fixed/removable drives and mounted volumes.
