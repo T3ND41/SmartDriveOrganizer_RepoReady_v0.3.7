@@ -28,10 +28,10 @@ The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, 
 
 - The first scan searches recursively through the selected local fixed/removable drives and mounted volumes. The default selection now includes all supported file families and file extensions; network drives remain opt-in.
 - The search is read-only. It records accessible file names, paths, categories and file metadata. It never moves, copies, renames or deletes anything during discovery.
-- The scanner identifies repeated filename words and phrases across **at least two different files**. Repeated words inside one file do not count as multiple matches.
+- The discovery engine identifies repeated filename words and phrases across **at least two different files**. Discovery currently analyses filename wording; it does not yet build a full-text index of every document. Repeated words inside one file do not count as multiple matches.
 - Existing built-in and saved keywords are not suggested again as new discoveries. Candidate groups are separated by file family and include a match count, sample names and original locations.
-- A review window lets you select, reject or rename proposed groups. Only groups you approve are saved as reusable local rules. The app then rescans and builds a fresh preview using those rules.
-- The final scan preview still controls what will be organized. Nothing is copied or moved until you click **Apply organization** and confirm.
+- A review window lets you select, skip or rename proposed groups. Only groups you approve are saved as reusable local rules. The app then rescans and builds a fresh preview using those rules.
+- The existing **Read document text where possible** option can still use supported document text to match saved rules. The final scan preview controls what will be organized. Nothing is copied or moved until you click **Apply organization** and confirm.
 - Approved patterns are saved locally and can be reused in later scans. They are also made available to the background organizer, subject to its own selected categories and selective-topic settings.
 
 ### Safe search boundaries
