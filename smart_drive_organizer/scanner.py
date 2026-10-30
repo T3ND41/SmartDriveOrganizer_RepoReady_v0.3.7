@@ -11,6 +11,7 @@ from .discovery import discover_repeated_groups
 from .learning import rejected_discovery_patterns
 from .file_types import extension_is_selected, normalize_extension_filters
 from .models import PlannedFile, ScanPlan
+from .operation_control import OperationCancelled, OperationControl
 
 PROTECTED_DIRECTORY_NAMES = {
     "$recycle.bin", "recycler", "system volume information", "windows", "windowsapps", "program files",
@@ -102,6 +103,9 @@ def scan_directory(
     selected_topics: Optional[Iterable[str]] = None,
     topic_rules: Optional[list] = None,
     extension_filters: Optional[dict[str, list[str]]] = None,
+    control: Optional[OperationControl] = None,
+    drive_index: int = 1,
+    drive_total: int = 1,
 ) -> ScanPlan:
     source = source_root.expanduser().resolve()
     output = output_root.expanduser().resolve()
@@ -143,14 +147,37 @@ def scan_directory(
     checked = 0
     discovery_candidates: list[tuple[Path, str]] = []
 
-    def report(message: str) -> None:
+    def report(message: object) -> None:
         if progress:
             progress(message)
+
+    def progress_snapshot() -> None:
+        if not progress:
+            return
+        found = len(plan.files)
+        rate = (found / checked * 100.0) if checked else 0.0
+        progress({
+            "phase": "scan",
+            "drive_index": drive_index,
+            "drive_total": drive_total,
+            "drives_completed": plan.drives_completed,
+            "files_checked": checked,
+            "files_matched": found,
+            "match_percent": rate,
+            "keywords": dict(plan.keyword_counts),
+            "current_drive": str(source),
+        })
 
     def on_walk_error(error: OSError) -> None:
         plan.warnings.append(f"Could not access folder: {error}")
 
     for current, dirs, filenames in os.walk(source, topdown=True, followlinks=False, onerror=on_walk_error):
+        if control is not None:
+            try:
+                control.checkpoint()
+            except OperationCancelled:
+                plan.cancelled = True
+                break
         current_path = Path(current)
         try:
             current_resolved = current_path.resolve()
@@ -192,11 +219,17 @@ def scan_directory(
             continue
 
         for filename in filenames:
+            if control is not None:
+                try:
+                    control.checkpoint()
+                except OperationCancelled:
+                    plan.cancelled = True
+                    break
             path = current_path / filename
             checked += 1
             plan.scanned_count += 1
-            if checked % 250 == 0:
-                report(f"Scanned {checked:,} files; found {len(plan.files):,} matching files...")
+            if checked % 100 == 0:
+                progress_snapshot()
             if filename.casefold() in PROTECTED_FILE_NAMES or path.suffix.casefold() in PROTECTED_FILE_EXTENSIONS:
                 plan.skipped_count += 1
                 continue
@@ -251,11 +284,12 @@ def scan_directory(
                     confidence=confidence,
                     size_bytes=size,
                 ))
+                plan.keyword_counts[topic] = plan.keyword_counts.get(topic, 0) + 1
             except OSError as error:
                 plan.skipped_count += 1
                 plan.warnings.append(f"Could not inspect {path}: {error}")
 
-        if not recursive:
+        if plan.cancelled or not recursive:
             break
 
     plan.discovery_candidates = discovery_candidates
@@ -269,8 +303,22 @@ def scan_directory(
             indexer.close()
         except Exception:
             plan.warnings.append("The local search index could not be committed; the organization preview is still available.")
+    if plan.cancelled:
+        plan.warnings.append("Scan cancelled by the user. Partial results are available for review; nothing has been organized.")
+    elif progress:
+        progress({
+            "phase": "scan_drive_complete",
+            "drive_index": drive_index,
+            "drive_total": drive_total,
+            "drives_completed": drive_index,
+            "files_checked": checked,
+            "files_matched": len(plan.files),
+            "match_percent": (len(plan.files) / checked * 100.0) if checked else 0.0,
+            "keywords": dict(plan.keyword_counts),
+            "current_drive": str(source),
+        })
     report(
-        f"Scan complete: {len(plan.files):,} files selected from {checked:,} files checked; "
+        f"Scan {'cancelled' if plan.cancelled else 'complete'}: {len(plan.files):,} files selected from {checked:,} files checked; "
         f"{len(plan.discovery_groups):,} recurring patterns discovered."
     )
     return plan
@@ -288,6 +336,7 @@ def scan_directories(
     selected_topics: Optional[Iterable[str]] = None,
     topic_rules: Optional[list] = None,
     extension_filters: Optional[dict[str, list[str]]] = None,
+    control: Optional[OperationControl] = None,
 ) -> ScanPlan:
     """Scan multiple selected roots into one shared destination plan.
 
@@ -343,6 +392,12 @@ def scan_directories(
     )
     failures: List[str] = []
     for index, source in enumerate(normalized, start=1):
+        if control is not None:
+            try:
+                control.checkpoint()
+            except OperationCancelled:
+                combined.cancelled = True
+                break
         if progress:
             progress(f"Scanning source {index:,}/{len(normalized):,}: {source}")
         try:
@@ -356,12 +411,21 @@ def scan_directories(
                 selected_topics=selected_topics,
                 topic_rules=topic_rules,
                 extension_filters=extension_filters,
+                control=control,
+                drive_index=index,
+                drive_total=len(normalized),
             )
             combined.files.extend(part.files)
             combined.discovery_candidates.extend(part.discovery_candidates)
             combined.warnings.extend(part.warnings)
             combined.skipped_count += part.skipped_count
             combined.scanned_count += part.scanned_count
+            for keyword, count in part.keyword_counts.items():
+                combined.keyword_counts[keyword] = combined.keyword_counts.get(keyword, 0) + count
+            if part.cancelled:
+                combined.cancelled = True
+                break
+            combined.drives_completed += 1
         except (OSError, ValueError) as error:
             message = f"Could not scan selected source {source}: {error}"
             combined.warnings.append(message)
@@ -392,8 +456,19 @@ def scan_directories(
     if not combined.files and failures:
         raise ValueError("None of the selected sources could be scanned. " + failures[0])
     if progress:
+        progress({
+            "phase": "scan_complete",
+            "drive_index": combined.drives_completed,
+            "drive_total": len(normalized),
+            "drives_completed": combined.drives_completed,
+            "files_checked": combined.scanned_count,
+            "files_matched": len(combined.files),
+            "match_percent": (len(combined.files) / combined.scanned_count * 100.0) if combined.scanned_count else 0.0,
+            "keywords": dict(combined.keyword_counts),
+            "cancelled": combined.cancelled,
+        })
         progress(
-            f"Multi-drive scan complete: {len(combined.files):,} matching files from "
-            f"{len(normalized):,} source(s); {combined.scanned_count:,} files checked."
+            f"Multi-drive scan {'cancelled' if combined.cancelled else 'complete'}: {len(combined.files):,} matching files from "
+            f"{combined.drives_completed:,}/{len(normalized):,} completed source(s); {combined.scanned_count:,} files checked."
         )
     return combined
