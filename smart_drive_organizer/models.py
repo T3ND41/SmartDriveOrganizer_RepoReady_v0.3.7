@@ -41,6 +41,9 @@ class ScanPlan:
     selected_extension_filters: Dict[str, List[str]] = field(default_factory=dict)
     discovery_candidates: List[Tuple[Path, str]] = field(default_factory=list)
     discovery_groups: List[DiscoveryGroup] = field(default_factory=list)
+    keyword_counts: Dict[str, int] = field(default_factory=dict)
+    drives_completed: int = 0
+    cancelled: bool = False
 
     def __post_init__(self) -> None:
         if not self.source_roots:
