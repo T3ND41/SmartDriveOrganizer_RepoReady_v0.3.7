@@ -24,6 +24,7 @@ from .scanner import scan_directories
 from .topic_rules_ui import TopicRulesDialog
 from .github_publish_ui import GitHubPublishDialog
 from .file_types import FileTypeSelectionDialog, extension_filter_summary, load_extension_filters, save_extension_filters
+from .learning import record_discovery_decisions, record_filing_correction, memory_summary
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
@@ -583,11 +584,18 @@ class OrganizerApp(tk.Tk):
         dialog = DiscoveryReviewDialog(self, self.plan.discovery_groups)
         self.wait_window(dialog)
         if dialog.result:
-            self._approve_discovered_groups(dialog.result)
+            groups = dialog.result.get("groups", [])
+            if dialog.result.get("decision") == "rejected":
+                record_discovery_decisions([], groups)
+                self.status_var.set(f"Remembered {len(groups):,} rejected pattern(s). They will be suppressed in future discovery scans.")
+                self._scan()
+            else:
+                self._approve_discovered_groups(groups)
 
     def _approve_discovered_groups(self, groups: list[dict]) -> None:
         """Persist approved patterns as reusable classifier rules, then rescan."""
         try:
+            record_discovery_decisions(groups, [])
             # Save to the general classifier as well as the selective-topic
             # list so accepted discoveries remain useful when the user changes
             # modes later. The automatic monitor reads these same local rules.
