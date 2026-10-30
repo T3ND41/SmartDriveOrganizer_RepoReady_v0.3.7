@@ -51,6 +51,7 @@ jobs:
           --hidden-import pypdf
           --hidden-import openpyxl
           --hidden-import pptx
+          --collect-submodules extract_msg
           --add-data "config;config"
           --add-data "smart_drive_organizer/assets;smart_drive_organizer/assets"
           run.py
