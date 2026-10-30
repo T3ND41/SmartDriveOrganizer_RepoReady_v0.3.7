@@ -1,0 +1,69 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from smart_drive_organizer.search_index import SearchIndex, build_index
+
+
+class SearchIndexTests(unittest.TestCase):
+    def test_search_finds_text_inside_a_file_and_applies_filters(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "Documents"
+            source.mkdir()
+            pdf = source / "unusual_name_001.txt"
+            pdf.write_text("Supplier quotation for a HDPE pipe fitting and pressure test.", encoding="utf-8")
+            index = SearchIndex(root / "index.sqlite3")
+            index.upsert_file(pdf, "Documents", pdf.read_text(encoding="utf-8"), "Quotations")
+            result = index.search(query="pressure test", category="Documents", extension=".txt", topic="Quotations")
+            self.assertEqual(len(result), 1)
+            self.assertEqual(result[0]["name"], pdf.name)
+            self.assertIn("pressure test", result[0]["body"])
+            index.close()
+
+    def test_index_skips_unchanged_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "source"
+            source.mkdir()
+            (source / "Monthly Statement.txt").write_text("A statement", encoding="utf-8")
+            database = root / "index.sqlite3"
+            first = build_index([source], ["Documents"], database=database)
+            second = build_index([source], ["Documents"], database=database)
+            self.assertEqual(first["refreshed"], 1)
+            self.assertEqual(second["refreshed"], 0)
+            self.assertEqual(second["total"], 1)
+
+    def test_index_excludes_protected_system_folders(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "drive"
+            (root / "Users" / "Person" / "Documents").mkdir(parents=True)
+            (root / "Windows" / "System32").mkdir(parents=True)
+            (root / "Program Files" / "Example").mkdir(parents=True)
+            (root / "Users" / "Person" / "Documents" / "LPO.txt").write_text("personal", encoding="utf-8")
+            (root / "Windows" / "System32" / "LPO.txt").write_text("system", encoding="utf-8")
+            (root / "Program Files" / "Example" / "LPO.txt").write_text("program", encoding="utf-8")
+            result = build_index([root], ["Documents"], database=Path(temp) / "index.sqlite3")
+            index = SearchIndex(Path(temp) / "index.sqlite3")
+            rows = index.search(query="LPO")
+            index.close()
+            self.assertEqual(result["indexed"], 1)
+            self.assertEqual([row["name"] for row in rows], ["LPO.txt"])
+            self.assertIn("Windows", rows[0]["path"]) is False
+
+    def test_full_text_query_can_search_filename_and_body(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            file = root / "Project_001.txt"
+            file.write_text("The confidential supplier requires a replacement valve.", encoding="utf-8")
+            index = SearchIndex(root / "index.sqlite3")
+            index.upsert_file(file, "Documents", "The confidential supplier requires a replacement valve.")
+            self.assertEqual(len(index.search(query="replacement valve")), 1)
+            self.assertEqual(len(index.search(query="Project_001")), 1)
+            index.close()
+
+
+if __name__ == "__main__":
+    unittest.main()
