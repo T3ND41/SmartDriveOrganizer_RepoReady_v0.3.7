@@ -511,28 +511,128 @@ class OrganizerApp(tk.Tk):
 
     def _set_busy(self, busy: bool, message: str = "") -> None:
         self.busy = busy
-        state = "disabled" if busy else "normal"
-        self.scan_button.configure(state=state)
-        self.apply_button.configure(state="disabled" if busy or not self.plan or not self.plan.files else "normal")
+        self.scan_button.configure(state="disabled" if busy else "normal")
+        self.apply_button.configure(state="disabled" if busy or not self.plan or not self.plan.files or self.plan.cancelled else "normal")
         self.teach_button.configure(state="disabled" if busy or not self.plan or not self.plan.files or not self.table.selection() else "normal")
-        if busy:
-            self.progress.start(10)
-            if message:
-                self.status_var.set(message)
-        else:
-            self.progress.stop()
-            self.progress_var.set(0)
+        self.pause_button.configure(state="normal" if busy else "disabled", text="Pause")
+        self.cancel_button.configure(state="normal" if busy else "disabled")
+        self.discovery_button.configure(state="disabled" if busy or not self.plan or not self.plan.discovery_groups else "normal")
+        if message:
+            self.status_var.set(message)
+        if not busy:
+            self.operation_control = None
 
-    def _start_job(self, kind: str, worker: Callable[[Callable[[str], None]], object]) -> None:
+    def _toggle_pause(self) -> None:
+        control = self.operation_control
+        if not self.busy or control is None:
+            return
+        if control.paused:
+            control.resume()
+            self.pause_button.configure(text="Pause")
+            self.status_var.set("Resuming operation…")
+        else:
+            control.pause()
+            self.pause_button.configure(text="Resume")
+            self.status_var.set("Paused. Progress is retained; choose Resume to continue.")
+
+    def _cancel_job(self) -> None:
+        control = self.operation_control
+        if not self.busy or control is None:
+            return
+        approved = messagebox.askyesno(
+            "Cancel current operation",
+            "Stop at the next safe checkpoint? File actions already completed will remain recorded in the audit journal. They will not be automatically rolled back.",
+            parent=self,
+            icon="warning",
+        )
+        if approved:
+            control.cancel()
+            self.status_var.set("Cancelling at the next safe checkpoint…")
+
+    def _update_telemetry(self, payload: object) -> None:
+        if not isinstance(payload, dict):
+            self.status_var.set(str(payload))
+            return
+        phase = str(payload.get("phase", ""))
+        if phase in {"scan", "scan_drive_complete", "scan_complete"}:
+            total = max(0, int(payload.get("drive_total", 0) or 0))
+            completed = max(0, int(payload.get("drives_completed", 0) or 0))
+            if phase == "scan_drive_complete":
+                completed = max(completed, int(payload.get("drive_index", completed) or completed))
+            if phase == "scan_complete":
+                completed = max(completed, int(payload.get("drives_completed", completed) or completed))
+                if not payload.get("cancelled") and total:
+                    completed = total
+            drive_percent = completed / total * 100.0 if total else 0.0
+            checked = max(0, int(payload.get("files_checked", 0) or 0))
+            found = max(0, int(payload.get("files_matched", 0) or 0))
+            match_rate = float(payload.get("match_percent", (found / checked * 100.0) if checked else 0.0) or 0.0)
+            self.progress_var.set(max(0.0, min(100.0, drive_percent)))
+            self.telemetry_var.set(
+                f"Drives completed: {completed:,}/{total:,} ({drive_percent:.1f}%)"
+                f"   •   Files found: {found:,} of {checked:,} examined ({match_rate:.1f}% match rate)"
+            )
+            current = str(payload.get("current_drive", "")).strip()
+            drive_index = int(payload.get("drive_index", completed + 1) or completed + 1)
+            if phase == "scan":
+                self.status_var.set(f"Searching drive {drive_index:,}/{max(1, total):,}: {current}")
+            elif phase == "scan_drive_complete":
+                self.status_var.set(f"Finished drive {drive_index:,}/{max(1, total):,}.")
+            else:
+                self.status_var.set("Scan stopped with partial results." if payload.get("cancelled") else "Scan finished.")
+            keywords = payload.get("keywords", {})
+            if isinstance(keywords, dict):
+                top = sorted(
+                    ((str(k), int(v)) for k, v in keywords.items()),
+                    key=lambda item: (-item[1], item[0].casefold()),
+                )[:12]
+                self.keyword_counts_var.set(
+                    "Keywords / groups found: " +
+                    (", ".join(f"{name} ({count:,})" for name, count in top) if top else "No topic matches yet")
+                )
+            return
+        if phase == "apply":
+            processed = max(0, int(payload.get("processed", 0) or 0))
+            total = max(0, int(payload.get("total", 0) or 0))
+            percent = processed / total * 100.0 if total else 0.0
+            self.progress_var.set(percent)
+            self.telemetry_var.set(f"Organization: {processed:,}/{total:,} files ({percent:.1f}%)")
+            status = str(payload.get("status", "processing")).replace("_", " ").title()
+            self.status_var.set(f"{status}: {payload.get('current_file', '')}")
+            return
+        if phase == "undo":
+            restored = max(0, int(payload.get("restored", 0) or 0))
+            skipped = max(0, int(payload.get("skipped", 0) or 0))
+            self.telemetry_var.set(f"Undo results: {restored:,} restored • {skipped:,} skipped")
+            self.status_var.set("Restoring moved files safely…")
+            return
+        if phase in {"index", "duplicates_hash", "duplicates_compare"}:
+            checked = int(payload.get("files_checked", payload.get("records_checked", payload.get("pairs_checked", 0))) or 0)
+            total = int(payload.get("files_indexed", payload.get("records_total", payload.get("candidate_pairs", 0))) or 0)
+            percent = checked / total * 100.0 if total else 0.0
+            self.progress_var.set(max(0.0, min(100.0, percent)))
+            self.telemetry_var.set(f"Analysis progress: {checked:,}/{total:,} ({percent:.1f}%)")
+            self.status_var.set("Indexing or comparing files…")
+            return
+        self.status_var.set(str(payload))
+
+    def _start_job(self, kind: str, worker: Callable[[Callable[[object], None], OperationControl], object]) -> None:
         if self.busy:
             return
         self.job_kind = kind
+        self.operation_control = OperationControl()
+        self.progress_var.set(0)
+        self.telemetry_var.set("Preparing operation…")
+        self.keyword_counts_var.set("Keywords / groups found: collecting…")
         self._set_busy(True, "Working…")
+        control = self.operation_control
 
         def run() -> None:
             try:
-                result = worker(lambda message: self.events.put(("progress", message)))
+                result = worker(lambda message: self.events.put(("progress", message)), control)
                 self.events.put(("done", result))
+            except OperationCancelled as error:
+                self.events.put(("cancelled", str(error)))
             except Exception as error:
                 self.events.put(("error", str(error)))
 
@@ -543,11 +643,15 @@ class OrganizerApp(tk.Tk):
             while True:
                 event, payload = self.events.get_nowait()
                 if event == "progress":
-                    self.status_var.set(str(payload))
+                    self._update_telemetry(payload)
                 elif event == "error":
                     self._set_busy(False)
                     self.status_var.set("The operation stopped. No unapproved changes were made.")
-                    messagebox.showerror("Smart Drive Organizer", str(payload))
+                    messagebox.showerror("Smart Drive Organizer", str(payload), parent=self)
+                elif event == "cancelled":
+                    self._set_busy(False)
+                    self.status_var.set("Operation cancelled at a safe checkpoint. Completed actions remain recorded.")
+                    messagebox.showinfo("Operation cancelled", str(payload) or "The operation was stopped safely.", parent=self)
                 elif event == "done":
                     self._set_busy(False)
                     self._job_finished(payload)
