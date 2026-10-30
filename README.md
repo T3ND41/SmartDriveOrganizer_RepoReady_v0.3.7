@@ -1,2 +1,59 @@
-# SmartDriveOrganizer_RepoReady_v0.3.7
-Project Overview: Intelligent File & Media Organizer  This program is an all-in-one background file manager and automated media organizer for all file types—including documents, images, videos, audio, and archives. Operating continuously as a system service or tray application, it starts automatically every time your laptop or PC is turned on.  It acts as an automated sorting assistant that actively scans, captures, and organizes files across designated watch directories (such as your Downloads folder) as soon as new items are added, downloaded, or created. Core Functionality & Features      Continuous 24/7 Monitoring: Runs silently in the background whenever the computer is active. It continuously watches designated source paths and automatically processes newly created or downloaded files without requiring manual intervention or opening a dashboard.      Smart Folder Management:          Automatically creates missing folders/subfolders based on custom topics or category names.          Seamlessly routes incoming files into existing directories.          Handles duplicate files and file-lock edge cases gracefully to prevent data loss or transfer errors.      Selective Processing (Strict Scope Control): Operates on an opt-in filter basis. Only files matching specified document topics or custom keywords (e.g., requisitions, statements, quotations) are touched. All other unselected files are left completely untouched in their original locations.      Flexible Pattern & Multi-Keyword Matching:          Supports case-insensitive partial substring and pattern matching (e.g., matching QUO to Quotation - S01610).          Allows multiple keywords or synonyms (QUO, Quotation, Quote) to point to the exact same destination folder.      Persistent Rule Storage: All custom keywords, paths, and settings are saved permanently in a local database or configuration file. They survive system reboots, app restarts, and updates until explicitly modified or deleted by the user.      One-Click GitHub Auto-Sync: Features built-in version control integration. Whenever you add new keywords, rules, or configurations, the application recognizes the update and prompts you with a single button to automatically commit and push the updated features or configuration straight to your connected GitHub repository.
+# Smart Drive Organizer — v0.3.7
+
+A local-first Windows file organizer with custom keyword routing, multi-drive scanning, persistent rules and optional background monitoring.
+
+## One-line PowerShell installation
+
+After the first Windows release is published, run:
+
+```powershell
+irm https://raw.githubusercontent.com/T3ND41/SmartDriveOrganizer_RepoReady_v0.3.7/main/install.ps1 | iex
+```
+
+The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, installs the per-user Windows application, creates a Start Menu shortcut and launches it.
+
+> This command executes a remote PowerShell installer. Inspect [install.ps1](install.ps1) before running it. The installer does not scan, move, copy, or delete your personal documents.
+
+## Features
+
+- Recursively scans selected folders and mounted drives.
+- Supports multiple source drives and one central output destination.
+- Custom topic rules with multiple keywords and partial/contains matching.
+- A separate destination folder for each keyword rule.
+- Reuses or creates topic folders and can separate by extension.
+- Copy and Move modes, collision-safe naming, journals and recovery.
+- Background monitoring of selected folders, with saved settings.
+- Selective organization: unmatched files remain untouched.
+- Optional GitHub publishing for approved rules and source changes.
+
+## Run from source
+
+Requires Python 3.10 or later.
+
+```powershell
+python -m pip install -e ".[content]"
+python run.py
+```
+
+Run tests with `python -m unittest discover -s tests -v`.
+
+## CI and Windows releases
+
+Pushes to `main` run tests on Windows and Linux. Pushing a version tag such as `v0.3.7` runs the Windows release workflow, which tests the project, builds the executable, packages it, calculates SHA-256 and publishes a GitHub Release.
+
+## Safety
+
+- Copy is recommended for first use.
+- Existing destination files are never overwritten.
+- Unknown or unmatched files are not automatically routed by selective rules.
+- Protected or inaccessible locations may be skipped.
+- Keep backups before large Move operations.
+- Background monitoring runs only while Windows is awake and the signed-in user session is active.
+
+## Optional short domain
+
+`https://smart.drive.win` requires deployment of the Cloudflare Worker in `cloudflare/` and control of the `drive.win` DNS zone. Until configured, use the direct GitHub Raw command above.
+
+## Repository
+
+https://github.com/T3ND41/SmartDriveOrganizer_RepoReady_v0.3.7
