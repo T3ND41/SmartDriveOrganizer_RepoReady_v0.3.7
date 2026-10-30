@@ -79,14 +79,18 @@ def analyze_duplicates(database: Path | None = None,
                 "hash": digest,
             })
 
-    version_map: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
+    version_map: dict[tuple[str, str], list[tuple[dict, bool]]] = defaultdict(list)
     for row in records:
         key, marked = _version_key(row["name"])
-        if key and marked:
-            version_map[(row["category"], row["extension"], key)].append(row)
+        if key:
+            version_map[(row["category"], key)].append((row, marked))
     versions = []
-    for (category, extension, key), files in version_map.items():
-        unique = {row["path"]: row for row in files}
+    for (category, key), items in version_map.items():
+        # Include an unmarked base filename when at least one sibling has an
+        # explicit revision/date/copy marker, e.g. Contract.pdf + Contract v2.pdf.
+        if not any(marked for _row, marked in items):
+            continue
+        unique = {row["path"]: row for row, _marked in items}
         if len(unique) > 1:
             versions.append({
                 "kind": "Possible document versions",
