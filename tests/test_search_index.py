@@ -51,7 +51,7 @@ class SearchIndexTests(unittest.TestCase):
             index.close()
             self.assertEqual(result["indexed"], 1)
             self.assertEqual([row["name"] for row in rows], ["LPO.txt"])
-            self.assertIn("Windows", rows[0]["path"]) is False
+            self.assertFalse("Windows" in rows[0]["path"])
 
     def test_full_text_query_can_search_filename_and_body(self):
         with tempfile.TemporaryDirectory() as temp:
