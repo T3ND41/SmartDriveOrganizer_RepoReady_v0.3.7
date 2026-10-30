@@ -12,11 +12,13 @@ from .file_types import extension_is_selected, normalize_extension_filters
 from .models import PlannedFile, ScanPlan
 
 PROTECTED_DIRECTORY_NAMES = {
-    "$recycle.bin", "recycler", "system volume information", "windows", "program files",
-    "program files (x86)", "programdata", "recovery", "perflogs", "$winreagent",
+    "$recycle.bin", "recycler", "system volume information", "windows", "windowsapps", "program files",
+    "program files (x86)", "programdata", "recovery", "perflogs", "$winreagent", "boot", "efi",
+    "$windows.~bt", "$windows.~ws", "config.msi", "msocache", "system restore",
     "documents and settings", "appdata", "proc", "sys", "dev", "run", "lost+found",
-    ".git", ".hg", ".svn", "node_modules", ".venv", "venv",
-    "__pycache__", ".pytest_cache", ".mypy_cache",
+    ".git", ".hg", ".svn", "node_modules", ".venv", "venv", ".cache", ".npm", ".pnpm-store",
+    ".yarn", ".gradle", ".m2", ".cargo", ".rustup", ".nuget", ".pytest_cache", ".mypy_cache",
+    ".tox", ".nox", "__pycache__",
 }
 PROTECTED_FILE_NAMES = {
     "pagefile.sys", "swapfile.sys", "hiberfil.sys", "bootmgr", "bootmgr.efi",
