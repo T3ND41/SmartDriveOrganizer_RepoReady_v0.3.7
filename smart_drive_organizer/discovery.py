@@ -63,7 +63,8 @@ def discover_repeated_groups(candidates: Iterable[tuple[Path, str]],
         if path_key in seen_files:
             continue
         seen_files.add(path_key)
-        words = _tokens(path.stem)
+        # A very long descriptive filename can otherwise produce thousands of n-grams.
+        words = _tokens(path.stem)[:20]
         keys: dict[str, list[str]] = {}
         for size in (1, 2, 3):
             for i in range(max(0, len(words) - size + 1)):
