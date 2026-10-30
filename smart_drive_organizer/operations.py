@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 from .models import ScanPlan
+from .operation_control import OperationCancelled, OperationControl
 
 HISTORY_FOLDER = ".smart_drive_organizer_history"
 CHUNK_SIZE = 1024 * 1024
@@ -67,7 +68,7 @@ def _reserve_destination(path: Path) -> None:
     os.close(fd)
 
 
-def _copy_verified(source: Path, destination: Path) -> str:
+def _copy_verified(source: Path, destination: Path, control: Optional[OperationControl] = None) -> str:
     """Copy through a same-directory temporary file and verify hashes before publishing."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=".sdo-stage-", suffix=source.suffix, dir=str(destination.parent))
@@ -75,7 +76,17 @@ def _copy_verified(source: Path, destination: Path) -> str:
     temp_path = Path(temp_name)
     try:
         source_hash_before = _sha256(source)
-        shutil.copy2(source, temp_path)
+        with source.open("rb") as source_handle, temp_path.open("wb") as target_handle:
+            while True:
+                if control is not None:
+                    control.checkpoint()
+                chunk = source_handle.read(CHUNK_SIZE)
+                if not chunk:
+                    break
+                target_handle.write(chunk)
+            target_handle.flush()
+            os.fsync(target_handle.fileno())
+        shutil.copystat(source, temp_path)
         staged_hash = _sha256(temp_path)
         source_hash_after = _sha256(source)
         if source_hash_before != staged_hash or source_hash_after != staged_hash:
@@ -95,7 +106,7 @@ def _copy_verified(source: Path, destination: Path) -> str:
             pass
 
 
-def _move_file(source: Path, destination: Path, allow_rename: bool = True) -> Tuple[Path, str]:
+def _move_file(source: Path, destination: Path, allow_rename: bool = True, control: Optional[OperationControl] = None) -> Tuple[Path, str]:
     """Move safely; same-volume moves are atomic, cross-volume moves are verified first."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     if allow_rename:
@@ -114,7 +125,7 @@ def _move_file(source: Path, destination: Path, allow_rename: bool = True) -> Tu
             raise
         return destination, "same-volume rename"
 
-    digest = _copy_verified(source, destination)
+    digest = _copy_verified(source, destination, control)
     try:
         source.unlink()
     except OSError as error:
@@ -127,6 +138,7 @@ def run_plan(
     mode: str,
     progress: Optional[Callable[[str], None]] = None,
     origin: str = "manual",
+    control: Optional[OperationControl] = None,
 ) -> Dict:
     """Apply a previewed plan. mode must be 'copy' or 'move'."""
     mode = mode.lower().strip()
@@ -150,7 +162,7 @@ def run_plan(
     journal_path = history_dir / f"run_{run_id}.json"
     journal: Dict = {
         "app": "Smart Drive Organizer",
-        "version": "0.3.4",
+        "version": "0.7.0",
         "run_id": run_id,
         "mode": mode,
         "origin": origin,
@@ -176,9 +188,12 @@ def run_plan(
 
     succeeded = 0
     failed = 0
+    cancelled = False
     for index, item in enumerate(plan.files, start=1):
         action = journal["actions"][index - 1]
         try:
+            if control is not None:
+                control.checkpoint()
             if not item.source.exists():
                 raise FileNotFoundError("The source file no longer exists. The preview may be out of date.")
             target = _unique_path(item.destination)
@@ -187,16 +202,20 @@ def run_plan(
             journal["updated_at"] = _timestamp()
             _write_json_atomic(journal_path, journal)
             if mode == "copy":
-                digest = _copy_verified(item.source, target)
+                digest = _copy_verified(item.source, target, control)
                 action["sha256"] = digest
                 action["status"] = "copied"
             else:
-                target, detail = _move_file(item.source, target, allow_rename=False)
+                target, detail = _move_file(item.source, target, allow_rename=False, control=control)
                 action["detail"] = detail
                 action["status"] = "moved" if not item.source.exists() else "copied_source_kept"
                 if action["status"] == "copied_source_kept":
                     action["error"] = detail
             succeeded += 1
+        except OperationCancelled as error:
+            action["status"] = "cancelled"
+            action["error"] = str(error)
+            cancelled = True
         except Exception as error:  # continue processing remaining files, preserving a per-file audit trail
             action["status"] = "failed"
             action["error"] = str(error)
@@ -204,15 +223,17 @@ def run_plan(
         action["finished_at"] = _timestamp()
         journal["updated_at"] = _timestamp()
         _write_json_atomic(journal_path, journal)
-        if progress and (index % 10 == 0 or index == len(plan.files)):
-            progress(f"Processed {index:,}/{len(plan.files):,}: {item.source.name} — {action['status']}")
+        if progress:
+            progress({"phase": "apply", "processed": index, "total": len(plan.files), "current_file": item.source.name, "status": action["status"]})
+        if cancelled:
+            break
 
     journal["finished_at"] = _timestamp()
-    journal["status"] = "completed" if failed == 0 else ("partial" if succeeded else "failed")
+    journal["status"] = "cancelled" if cancelled else ("completed" if failed == 0 else ("partial" if succeeded else "failed"))
     source_kept = sum(1 for action in journal["actions"] if action.get("status") == "copied_source_kept")
-    journal["summary"] = {"total": len(plan.files), "succeeded": succeeded, "failed": failed, "source_kept": source_kept}
+    journal["summary"] = {"total": len(plan.files), "succeeded": succeeded, "failed": failed, "source_kept": source_kept, "cancelled": cancelled}
     _write_json_atomic(journal_path, journal)
-    return {"journal_path": journal_path, "journal": journal, "succeeded": succeeded, "failed": failed, "source_kept": source_kept}
+    return {"journal_path": journal_path, "journal": journal, "succeeded": succeeded, "failed": failed, "source_kept": source_kept, "cancelled": cancelled}
 
 
 def latest_movable_journal(output_root: Path, origin: Optional[str] = None) -> Optional[Path]:
