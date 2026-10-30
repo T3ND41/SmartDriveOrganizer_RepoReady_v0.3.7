@@ -36,7 +36,7 @@ The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, 
 
 ### Safe search boundaries
 
-To protect Windows, installed applications and development environments, the scanner deliberately skips Windows and recovery directories, Program Files, ProgramData, AppData, recycle-bin/system-volume folders, protected operating-system files, project roots and common dependency/cache folders. It also avoids following symbolic links, junctions and other reparse points. Inaccessible folders are reported as warnings rather than forced open. Network locations are not selected automatically.
+To protect Windows, installed applications and development environments, the scanner deliberately skips Windows and recovery directories, Boot/EFI areas, Program Files, ProgramData, AppData, recycle-bin/system-volume folders, protected operating-system files, project roots and common package/dependency/cache folders. It also avoids following symbolic links, junctions and other reparse points. Inaccessible folders are reported as warnings rather than forced open. Network locations are not selected automatically.
 
 This is an intentionally safe deep search of accessible personal/work files on the selected volumes, **not a byte-for-byte search of every protected operating-system location**. Some user data stored inside excluded locations such as AppData will therefore not appear. No scan can promise access to every file on a machine, because permissions, encryption, offline drives and damaged media can prevent access.
 
