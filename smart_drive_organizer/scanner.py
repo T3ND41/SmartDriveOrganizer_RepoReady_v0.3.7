@@ -7,6 +7,7 @@ from typing import Callable, Iterable, List, Optional, Set
 
 from .classifier import category_for, classify_selected_topic, classify_topic, extension_bucket, selected_topic_destination
 from .content_reader import read_document_text
+from .discovery import discover_repeated_groups
 from .file_types import extension_is_selected, normalize_extension_filters
 from .models import PlannedFile, ScanPlan
 
@@ -131,6 +132,7 @@ def scan_directory(
     for route_destination in route_destinations:
         _validate_route_destination(route_destination, source)
     checked = 0
+    discovery_candidates: list[tuple[Path, str]] = []
 
     def report(message: str) -> None:
         if progress:
@@ -201,6 +203,9 @@ def scan_directory(
                     continue
                 if not extension_is_selected(path, category, normalized_extension_filters):
                     continue
+                # Collect filename metadata for read-only pattern discovery, even
+                # when selective-topic mode later leaves this file unplanned.
+                discovery_candidates.append((path, category))
                 size = path.stat().st_size
                 content = ""
                 if read_contents and category == "Documents" and size <= 20 * 1024 * 1024:
@@ -232,7 +237,12 @@ def scan_directory(
         if not recursive:
             break
 
-    report(f"Scan complete: {len(plan.files):,} files selected from {checked:,} files checked.")
+    plan.discovery_candidates = discovery_candidates
+    plan.discovery_groups = discover_repeated_groups(discovery_candidates, rules, topic_rules)
+    report(
+        f"Scan complete: {len(plan.files):,} files selected from {checked:,} files checked; "
+        f"{len(plan.discovery_groups):,} recurring patterns discovered."
+    )
     return plan
 
 
@@ -318,6 +328,7 @@ def scan_directories(
                 extension_filters=extension_filters,
             )
             combined.files.extend(part.files)
+            combined.discovery_candidates.extend(part.discovery_candidates)
             combined.warnings.extend(part.warnings)
             combined.skipped_count += part.skipped_count
             combined.scanned_count += part.scanned_count
@@ -338,6 +349,14 @@ def scan_directories(
         file_keys.add(key)
         unique_files.append(item)
     combined.files = unique_files
+    unique_candidates: dict[str, tuple[Path, str]] = {}
+    for candidate_path, candidate_category in combined.discovery_candidates:
+        candidate_key = os.path.normcase(str(candidate_path))
+        unique_candidates[candidate_key] = (candidate_path, candidate_category)
+    combined.discovery_candidates = list(unique_candidates.values())
+    combined.discovery_groups = discover_repeated_groups(
+        combined.discovery_candidates, custom_rules, topic_rules
+    )
 
     if not combined.files and failures:
         raise ValueError("None of the selected sources could be scanned. " + failures[0])
