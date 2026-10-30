@@ -63,7 +63,7 @@ class OrganizerApp(tk.Tk):
         self.configure(bg="#f3f5f8")
 
         self.source_entries: list[tuple[Path, str]] = []
-        self.output_var = tk.StringVar()
+        self.output_var = tk.StringVar(value=str(Path.home() / "Documents" / "Smart Drive Organizer" / "Organized Files"))
         self.mode_var = tk.StringVar(value="copy")
         self.recursive_var = tk.BooleanVar(value=True)
         self.content_var = tk.BooleanVar(value=True)
