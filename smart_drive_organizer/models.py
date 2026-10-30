@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 
 @dataclass
@@ -18,6 +18,17 @@ class PlannedFile:
 
 
 @dataclass
+class DiscoveryGroup:
+    """A recurring filename pattern found across distinct files."""
+    phrase: str
+    suggested_name: str
+    category: str
+    file_count: int
+    sample_files: List[str] = field(default_factory=list)
+    sample_locations: List[str] = field(default_factory=list)
+
+
+@dataclass
 class ScanPlan:
     source_root: Path
     output_root: Path
@@ -28,6 +39,8 @@ class ScanPlan:
     scanned_count: int = 0
     source_roots: List[Path] = field(default_factory=list)
     selected_extension_filters: Dict[str, List[str]] = field(default_factory=dict)
+    discovery_candidates: List[Tuple[Path, str]] = field(default_factory=list)
+    discovery_groups: List[DiscoveryGroup] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.source_roots:
