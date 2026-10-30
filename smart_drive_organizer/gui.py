@@ -28,6 +28,7 @@ from .learning import record_discovery_decisions, record_filing_correction, memo
 from .search_dashboard import SearchDashboardDialog
 from .memory_ui import LearningMemoryDialog
 from .search_index import sync_journal_actions
+from .operation_control import OperationCancelled, OperationControl
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
@@ -89,6 +90,7 @@ class OrganizerApp(tk.Tk):
         self.events: queue.Queue = queue.Queue()
         self.busy = False
         self.job_kind: Optional[str] = None
+        self.operation_control: Optional[OperationControl] = None
         self._build_ui()
         self.after(120, self._poll_events)
 
