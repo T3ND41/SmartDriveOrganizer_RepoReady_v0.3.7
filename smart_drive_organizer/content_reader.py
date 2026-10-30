@@ -6,6 +6,7 @@ from email import policy
 from email.parser import BytesParser
 from html import unescape
 from pathlib import Path
+import sys
 
 MAX_READ_BYTES = 64 * 1024 * 1024
 MAX_TEXT_CHARS = 250_000
@@ -135,6 +136,119 @@ def _msg_text(path: Path) -> str:
         message.close()
 
 
+def _legacy_office_text(path: Path, kind: str) -> str:
+    """Read binary .doc/.xls/.ppt files through installed desktop Office, when available.
+
+    Uses a separate hidden Office process, opens files read-only, disables macro
+    automation and external workbook link updates, and always closes the document.
+    No Office installation is downloaded or changed.
+    """
+    if sys.platform != "win32":
+        return ""
+    try:
+        import pythoncom
+        import win32com.client
+    except ImportError:
+        return ""
+
+    pythoncom.CoInitialize()
+    application = None
+    document = None
+    pieces: list[str] = []
+    total = 0
+    try:
+        if kind == "word":
+            application = win32com.client.DispatchEx("Word.Application")
+            application.Visible = False
+            application.DisplayAlerts = 0
+            application.AutomationSecurity = 3
+            document = application.Documents.Open(
+                FileName=str(path), ConfirmConversions=False, ReadOnly=True,
+                AddToRecentFiles=False, Revert=False, NoEncodingDialog=True,
+                OpenAndRepair=True,
+            )
+            value = str(document.Content.Text or "")
+            return value[:MAX_TEXT_CHARS]
+
+        if kind == "excel":
+            application = win32com.client.DispatchEx("Excel.Application")
+            application.Visible = False
+            application.DisplayAlerts = False
+            application.AutomationSecurity = 3
+            application.EnableEvents = False
+            application.AskToUpdateLinks = False
+            document = application.Workbooks.Open(
+                Filename=str(path), UpdateLinks=0, ReadOnly=True,
+                AddToMru=False, IgnoreReadOnlyRecommended=True,
+            )
+            sheet_count = min(int(document.Worksheets.Count), 30)
+            for sheet_index in range(1, sheet_count + 1):
+                sheet = document.Worksheets(sheet_index)
+                used = sheet.UsedRange
+                values = used.Value
+                if values is None:
+                    continue
+                if not isinstance(values, tuple):
+                    values = ((values,),)
+                for row in values[:2000]:
+                    cells = row if isinstance(row, tuple) else (row,)
+                    line = " ".join(str(value) for value in cells if value is not None)
+                    if line:
+                        pieces.append(line)
+                        total += len(line)
+                    if total >= MAX_TEXT_CHARS:
+                        break
+                if total >= MAX_TEXT_CHARS:
+                    break
+            return " ".join(pieces)[:MAX_TEXT_CHARS]
+
+        if kind == "powerpoint":
+            application = win32com.client.DispatchEx("PowerPoint.Application")
+            application.DisplayAlerts = 1
+            document = application.Presentations.Open(
+                str(path), ReadOnly=True, Untitled=False, WithWindow=False,
+            )
+            slide_count = min(int(document.Slides.Count), 250)
+            for slide_index in range(1, slide_count + 1):
+                slide = document.Slides(slide_index)
+                for shape_index in range(1, int(slide.Shapes.Count) + 1):
+                    shape = slide.Shapes(shape_index)
+                    try:
+                        if shape.HasTextFrame and shape.TextFrame.HasText:
+                            value = str(shape.TextFrame.TextRange.Text or "")
+                            pieces.append(value)
+                            total += len(value)
+                    except Exception:
+                        continue
+                    if total >= MAX_TEXT_CHARS:
+                        break
+                if total >= MAX_TEXT_CHARS:
+                    break
+            return " ".join(pieces)[:MAX_TEXT_CHARS]
+        return ""
+    except Exception:
+        # Office is optional and may be unavailable, busy, or unable to open a
+        # damaged/locked file. The metadata record can still be indexed.
+        return ""
+    finally:
+        if document is not None:
+            try:
+                if kind == "word":
+                    document.Close(False)
+                elif kind == "excel":
+                    document.Close(SaveChanges=False)
+                elif kind == "powerpoint":
+                    document.Close()
+            except Exception:
+                pass
+        if application is not None:
+            try:
+                application.Quit()
+            except Exception:
+                pass
+        pythoncom.CoUninitialize()
+
+
 def read_document_text(path: Path) -> str:
     """Extract bounded searchable text locally; unsupported/locked formats return empty text."""
     suffix = path.suffix.lower()
@@ -151,12 +265,18 @@ def read_document_text(path: Path) -> str:
             return re.sub(r"\\[a-zA-Z]+-?\d* ?|[{}]", " ", text)[:MAX_TEXT_CHARS]
         if suffix == ".docx":
             return _docx_text(path)
+        if suffix == ".doc":
+            return _legacy_office_text(path, "word")
         if suffix == ".pdf":
             return _pdf_text(path)
         if suffix in {".xlsx", ".xlsm"}:
             return _xlsx_text(path)
+        if suffix == ".xls":
+            return _legacy_office_text(path, "excel")
         if suffix == ".pptx":
             return _pptx_text(path)
+        if suffix == ".ppt":
+            return _legacy_office_text(path, "powerpoint")
         if suffix == ".eml":
             return _eml_text(path)
         if suffix == ".msg":
