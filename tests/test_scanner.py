@@ -300,5 +300,25 @@ class ScannerTests(unittest.TestCase):
             self.assertEqual(len(plan.discovery_candidates), 1)
 
 
+    def test_cancelled_scan_returns_partial_plan_without_applying_files(self):
+        from smart_drive_organizer.operation_control import OperationControl
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "source"
+            root.mkdir()
+            for index in range(5):
+                (root / f"Monthly Statement {index}.pdf").write_bytes(b"statement")
+            control = OperationControl()
+            control.cancel()
+            plan = scan_directory(
+                root, Path(temp) / "output", ["Documents"],
+                read_contents=False, control=control,
+            )
+            self.assertTrue(plan.cancelled)
+            self.assertEqual(plan.files, [])
+            self.assertTrue((root / "Monthly Statement 0.pdf").is_file())
+
+
+
 if __name__ == "__main__":
     unittest.main()
