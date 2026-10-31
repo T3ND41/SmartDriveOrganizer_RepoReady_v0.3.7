@@ -13,6 +13,7 @@ from tkinter import messagebox, ttk
 from .duplicates import analyze_duplicates, recycle_exact_duplicates
 from .search_index import SearchIndex, build_index
 from .operation_control import OperationCancelled, OperationControl
+from .theme import palette_for
 
 
 def _open_path(path: Path) -> None:
@@ -49,15 +50,19 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.grab_set()
         self.groups = result.get("exact", []) + result.get("versions", []) + result.get("near", [])
         self.active_files: list[dict] = []
-        bg, black, white, red = "#F4F4F5", "#101010", "#FFFFFF", "#D71920"
+        palette = palette_for(parent)
+        bg, card, ink, black, white, red, muted = (
+            palette["bg"], palette["card"], palette["ink"], palette["black"],
+            palette["white"], palette["red"], palette["muted"],
+        )
         self.configure(bg=bg)
         style = ttk.Style(self)
         try: style.theme_use("clam")
         except tk.TclError: pass
         style.configure("TFrame", background=bg)
-        style.configure("TLabel", background=bg, foreground=black, font=("Segoe UI", 9))
-        style.configure("Title.TLabel", background=bg, foreground=black, font=("Segoe UI", 18, "bold"))
-        style.configure("Treeview", rowheight=27, font=("Segoe UI", 9))
+        style.configure("TLabel", background=bg, foreground=ink, font=("Segoe UI", 9))
+        style.configure("Title.TLabel", background=bg, foreground=ink, font=("Segoe UI", 18, "bold"))
+        style.configure("Treeview", rowheight=27, font=("Segoe UI", 9), background=card, fieldbackground=card, foreground=ink)
         style.configure("Treeview.Heading", background=black, foreground=white, font=("Segoe UI", 9, "bold"), padding=7)
         style.configure("Primary.TButton", background=red, foreground=white, font=("Segoe UI", 9, "bold"), padding=9)
         outer = ttk.Frame(self, padding=14); outer.pack(fill="both", expand=True)
@@ -212,20 +217,26 @@ class SearchDashboardDialog(tk.Toplevel):
         self.events: queue.Queue = queue.Queue()
         self.busy = False
         self.operation_control: OperationControl | None = None
-        bg, white, black, red, muted = "#F4F4F5", "#FFFFFF", "#101010", "#D71920", "#666666"
+        palette = palette_for(parent)
+        bg, white, black, red, muted = (
+            palette["bg"], palette["card"], palette["black"],
+            palette["red"], palette["muted"],
+        )
+        ink = palette["ink"]
+        self.theme_name = getattr(parent, "theme_name", "light")
         self.configure(bg=bg)
         style = ttk.Style(self)
         try: style.theme_use("clam")
         except tk.TclError: pass
         style.configure("TFrame", background=bg)
-        style.configure("TLabel", background=bg, foreground=black, font=("Segoe UI", 9))
+        style.configure("TLabel", background=bg, foreground=ink, font=("Segoe UI", 9))
         style.configure("Title.TLabel", background=bg, foreground=black, font=("Segoe UI", 22, "bold"))
         style.configure("Hint.TLabel", background=bg, foreground=muted, font=("Segoe UI", 9))
-        style.configure("TEntry", padding=8, fieldbackground=white)
+        style.configure("TEntry", padding=8, fieldbackground=white, foreground=ink)
         style.configure("TButton", font=("Segoe UI", 9), padding=(10, 7))
         style.configure("Primary.TButton", background=red, foreground=white, font=("Segoe UI", 9, "bold"), padding=(14, 9))
         style.map("Primary.TButton", background=[("active", "#B9151B")])
-        style.configure("Treeview", rowheight=28, font=("Segoe UI", 9), background=white, fieldbackground=white)
+        style.configure("Treeview", rowheight=28, font=("Segoe UI", 9), background=white, fieldbackground=white, foreground=ink)
         style.configure("Treeview.Heading", background=black, foreground=white, font=("Segoe UI", 9, "bold"), padding=7)
 
         outer = ttk.Frame(self, padding=18); outer.pack(fill="both", expand=True)
@@ -283,7 +294,7 @@ class SearchDashboardDialog(tk.Toplevel):
         self.tree.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
         self.tree.grid(row=0, column=0, sticky="nsew"); yscroll.grid(row=0, column=1, sticky="ns"); xscroll.grid(row=1, column=0, sticky="ew")
         result_frame.rowconfigure(0, weight=3); result_frame.columnconfigure(0, weight=1)
-        self.preview = tk.Text(result_frame, height=7, wrap="word", font=("Segoe UI", 9), relief="solid", borderwidth=1, bg=white, fg=black)
+        self.preview = tk.Text(result_frame, height=7, wrap="word", font=("Segoe UI", 9), relief="solid", borderwidth=1, bg=white, fg=ink)
         self.preview.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
         self.preview.insert("1.0", "Select a result to preview its indexed text. The preview is stored locally and does not alter the original file.")
         self.preview.configure(state="disabled")
