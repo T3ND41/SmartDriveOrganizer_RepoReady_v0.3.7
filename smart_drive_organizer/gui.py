@@ -885,7 +885,7 @@ class OrganizerApp(tk.Tk):
             icon="warning",
         ):
             return
-        self._start_job("undo", lambda progress: self._undo_and_sync(journal, progress))
+        self._start_job("undo", lambda progress, control: self._undo_and_sync(journal, progress, control))
 
     def _undo_and_sync(self, journal: Path, progress: Callable[[object], None], control: OperationControl) -> object:
         result = undo_move_journal(journal, progress, control)
