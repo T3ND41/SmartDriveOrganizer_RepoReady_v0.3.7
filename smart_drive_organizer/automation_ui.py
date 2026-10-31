@@ -10,6 +10,7 @@ from .classifier import load_topic_rules, save_topic_rules
 from .topic_rules_ui import TopicRulesDialog
 from .github_publish_ui import GitHubPublishDialog
 from .file_types import FileTypeSelectionDialog, extension_filter_summary, save_extension_filters
+from .theme import apply_dialog_theme
 
 from .automation import (
     AutomationConfig,
@@ -37,6 +38,7 @@ class AutomationSettingsDialog(tk.Toplevel):
         self.minsize(740, 760)
         self.transient(parent)
         self.grab_set()
+        palette = apply_dialog_theme(self, parent)
         self.config_data = load_settings()
         self.extension_filters = dict(self.config_data.extension_filters)
         self.folder_paths = list(self.config_data.monitor_folders)
@@ -54,7 +56,7 @@ class AutomationSettingsDialog(tk.Toplevel):
 
         folders = ttk.LabelFrame(outer, text="1. Folders to monitor", padding=10)
         folders.pack(fill="x", pady=(0, 10))
-        self.folder_list = tk.Listbox(folders, height=5, selectmode=tk.EXTENDED, exportselection=False)
+        self.folder_list = tk.Listbox(folders, height=5, selectmode=tk.EXTENDED, exportselection=False, bg=palette["card"], fg=palette["ink"], selectbackground=palette["red"], selectforeground=palette["white"], highlightthickness=1, highlightbackground=palette["border"])
         self.folder_list.pack(side="left", fill="both", expand=True)
         for value in self.folder_paths:
             self.folder_list.insert("end", value)
