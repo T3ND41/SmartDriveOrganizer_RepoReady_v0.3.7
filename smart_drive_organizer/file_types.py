@@ -8,6 +8,8 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 from typing import Iterable
 
+from .theme import apply_dialog_theme
+
 # Everyday formats first, followed by less common and specialist formats.
 FILE_TYPE_GROUPS: dict[str, dict[str, list[str]]] = {
     "Documents": {
@@ -135,6 +137,9 @@ class FileTypeSelectionDialog(tk.Toplevel):
         self.minsize(650, 520)
         self.transient(parent)
         self.grab_set()
+        palette = apply_dialog_theme(self, parent)
+        style = ttk.Style(self)
+        style.configure("Title.TLabel", background=palette["bg"], foreground=palette["ink"], font=("Segoe UI", 15, "bold"))
         self.result: dict[str, list[str]] | None = None
         self.categories = [name for name in categories if name in FILE_TYPE_GROUPS]
         self.current_filters = normalize_extension_filters(current_filters or {})
@@ -144,7 +149,7 @@ class FileTypeSelectionDialog(tk.Toplevel):
 
         outer = ttk.Frame(self, padding=14)
         outer.pack(fill="both", expand=True)
-        ttk.Label(outer, text="Choose the exact formats to include", font=("Segoe UI", 15, "bold")).pack(anchor="w")
+        ttk.Label(outer, text="Choose the exact formats to include", style="Title.TLabel").pack(anchor="w")
         ttk.Label(outer, text="Choose All supported formats or only the formats you select. Common formats appear first; additional and specialist formats are below.", wraplength=720).pack(anchor="w", pady=(5, 10))
         if not self.categories:
             ttk.Label(outer, text="Select at least one file family on the main screen, then open this picker.").pack(anchor="w")
@@ -174,7 +179,7 @@ class FileTypeSelectionDialog(tk.Toplevel):
         ttk.Button(buttons, text="Clear selection", command=lambda name=category: self._clear(name)).pack(side="left")
         shell = ttk.Frame(tab)
         shell.pack(fill="both", expand=True)
-        canvas = tk.Canvas(shell, highlightthickness=0)
+        canvas = tk.Canvas(shell, highlightthickness=0, bg=palette["card"])
         scrollbar = ttk.Scrollbar(shell, orient="vertical", command=canvas.yview)
         content = ttk.Frame(canvas)
         content.bind("<Configure>", lambda _event, c=canvas: c.configure(scrollregion=c.bbox("all")))
