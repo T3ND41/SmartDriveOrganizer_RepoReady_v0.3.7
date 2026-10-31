@@ -204,7 +204,7 @@ class SearchIndexTests(unittest.TestCase):
             app_data = root / "appdata"
             app_data.mkdir()
             database = root / "index.sqlite3"
-            with patch.dict("os.environ", {"LOCALAPPDATA": str(app_data)}):
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(app_data), "XDG_CONFIG_HOME": str(app_data)}):
                 build_index([source], ["Documents"], database=database)
                 save_custom_rules(app_data / "SmartDriveOrganizer" / "keyword_rules.json", [
                     {"name": "Preferred Supplier Quotes", "keywords": ["supplier quotation"], "category": "Documents"}
