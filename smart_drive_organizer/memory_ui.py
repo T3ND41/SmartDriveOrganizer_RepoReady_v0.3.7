@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .learning import forget_rejected_pattern, load_memory, memory_summary
+from .theme import apply_dialog_theme
 
 
 class LearningMemoryDialog(tk.Toplevel):
@@ -15,15 +16,10 @@ class LearningMemoryDialog(tk.Toplevel):
         self.minsize(760, 520)
         self.transient(parent)
         self.grab_set()
-        bg, black, white, red = "#F4F4F5", "#101010", "#FFFFFF", "#D71920"
-        self.configure(bg=bg)
+        palette = apply_dialog_theme(self, parent)
+        bg, black, white, red, ink = palette["bg"], palette["black"], palette["white"], palette["red"], palette["ink"]
         style = ttk.Style(self)
-        try: style.theme_use("clam")
-        except tk.TclError: pass
-        style.configure("TFrame", background=bg)
-        style.configure("TLabel", background=bg, foreground=black, font=("Segoe UI", 9))
-        style.configure("Title.TLabel", background=bg, foreground=black, font=("Segoe UI", 19, "bold"))
-        style.configure("Treeview", rowheight=28, font=("Segoe UI", 9))
+        style.configure("Title.TLabel", background=bg, foreground=ink, font=("Segoe UI", 19, "bold"))
         style.configure("Treeview.Heading", background=black, foreground=white, font=("Segoe UI", 9, "bold"), padding=7)
         style.configure("Primary.TButton", background=red, foreground=white, font=("Segoe UI", 9, "bold"), padding=9)
         outer = ttk.Frame(self, padding=16); outer.pack(fill="both", expand=True)
