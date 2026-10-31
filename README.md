@@ -28,6 +28,15 @@ Exact duplicates are byte-for-byte matches verified using SHA-256. The default a
 
 Use the one-line command under **Run without installing**. It checks for an existing per-user copy in `%LOCALAPPDATA%\\Programs\\SmartDriveOrganizer` and portable copies under `%LOCALAPPDATA%\\SmartDriveOrganizer\\PortableRuntime`. If a current version is already present, it launches that copy. If an older copy is found, it offers an update and updates that same folder rather than creating another application folder. The launcher will not replace an executable while Smart Drive Organizer is running.
 
+## Brand, live progress and workflow controls (v0.7.0)
+
+- Applied the official supplied face-and-skull mark and the supplied light/dark feature icon artwork. The visual system uses red `#D71920`, black `#101010` and white `#FFFFFF`.
+- Added three switchable desktop themes: Light, Dark and Redline. The selected theme is saved locally.
+- Added a branded circular coverage indicator. During scans it reports the percentage of selected drives completed, the number of files found versus examined, the match rate, the active search terms and the groups/files matched.
+- Pause, Resume and Cancel are available during drive scans, search-index refresh, duplicate analysis, Apply and Undo. Pause retains the current in-memory progress; Cancel stops at a safe checkpoint and records completed actions. Closing the application is not a persisted pause.
+- Duplicate review highlights exact SHA-256 matches and shows the oldest and newest copies side by side with their original paths, sizes and modification times. Only byte-for-byte exact copies can be sent to the Recycle Bin, and only after explicit confirmation and a fresh hash check. The newest exact copy is the default keeper. Possible versions and near-matches are review-only and cannot be deleted through this action.
+- The no-install PowerShell launcher checks installed and portable copies before downloading. It opens an already-current copy without making another one; when a newer published release exists, it asks before updating the existing copy. On first use it keeps one portable runtime cache and does not create Start Menu shortcuts or installer registry entries.
+
 ## Optional conventional installer
 
 The no-install PowerShell launcher is recommended. The conventional per-user installer is still available separately:
