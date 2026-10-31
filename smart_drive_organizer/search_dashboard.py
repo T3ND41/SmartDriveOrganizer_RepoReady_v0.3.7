@@ -89,7 +89,7 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.tree.pack(side="left", fill="both", expand=True); scroll.pack(side="right", fill="y")
         details = ttk.LabelFrame(body, text="Files in selected group", padding=8)
         details.pack(side="left", fill="both", padx=(10, 0))
-        self.file_list = tk.Listbox(details, width=52, height=8, font=("Segoe UI", 8), selectbackground=red, selectforeground=white)
+        self.file_list = tk.Listbox(details, width=52, height=8, font=("Segoe UI", 8), bg=card, fg=ink, selectbackground=red, selectforeground=white, highlightthickness=1, highlightbackground=palette["border"])
         self.file_list.pack(fill="x", expand=False)
         self.compare_frame = ttk.Frame(details)
         self.compare_frame.pack(fill="both", expand=True, pady=(8, 0))
