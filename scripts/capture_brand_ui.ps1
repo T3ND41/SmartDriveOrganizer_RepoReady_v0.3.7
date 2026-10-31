@@ -5,6 +5,9 @@ $appData = Join-Path $env:LOCALAPPDATA 'SmartDriveOrganizer'
 New-Item -ItemType Directory -Force -Path $out, $appData | Out-Null
 
 Add-Type -AssemblyName System.Drawing
+if (Get-Command Set-DisplayResolution -ErrorAction SilentlyContinue) {
+  Set-DisplayResolution -Width 1600 -Height 1200 -Force
+}
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
