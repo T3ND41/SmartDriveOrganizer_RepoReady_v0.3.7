@@ -228,13 +228,11 @@ class OrganizerApp(tk.Tk):
         self.nav_icon_photos = []
         def nav_icon(parent: tk.Misc, kind: str, background: str, accent: bool = False) -> tk.Widget:
             asset_name = NAV_FEATURE_ICONS.get(kind, "workspace")
-            photo = self.feature_icons.get(asset_name)
+            photo = self.feature_icons.get(asset_name) or self.feature_icons.get("workspace")
             if photo is not None:
                 return tk.Label(parent, image=photo, bg=background, borderwidth=0)
-            canvas = tk.Canvas(parent, width=24, height=24, bg=background, highlightthickness=0, borderwidth=0)
-            canvas.create_oval(4, 4, 20, 20, outline=white, width=1.7)
-            canvas.create_oval(9, 9, 15, 15, fill=red, outline=red)
-            return canvas
+            # Do not draw substitute symbols when a supplied feature icon is unavailable.
+            return tk.Label(parent, text="", bg=background, width=4, borderwidth=0)
 
         def nav_button(label: str, command: Callable[[], None], icon: str, accent: bool = False) -> None:
             button_bg = red if accent else black
