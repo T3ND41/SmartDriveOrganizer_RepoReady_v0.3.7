@@ -3,8 +3,8 @@ $ErrorActionPreference = 'Stop'
 $owner = 'T3ND41'
 $repository = 'SmartDriveOrganizer_RepoReady_v0.3.7'
 $apiUri = "https://api.github.com/repos/$owner/$repository/releases/latest"
-$managedRoot = Join-Path $env:LOCALAPPDATA 'Programs\SmartDriveOrganizer'
-$runtimeRoot = Join-Path $env:LOCALAPPDATA 'SmartDriveOrganizer\PortableRuntime'
+$managedRoot = $null
+$runtimeRoot = $null
 
 function Get-VersionValue([string]$Value) {
     $text = ([string]$Value).Trim()
@@ -78,6 +78,8 @@ try {
     if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
         throw 'Windows did not provide a LOCALAPPDATA folder for this user.'
     }
+    $managedRoot = Join-Path $env:LOCALAPPDATA 'Programs\SmartDriveOrganizer'
+    $runtimeRoot = Join-Path $env:LOCALAPPDATA 'SmartDriveOrganizer\PortableRuntime'
 
     # Do not start a second window or replace an executable while it is running.
     $running = Get-Process -Name 'SmartDriveOrganizer' -ErrorAction SilentlyContinue
