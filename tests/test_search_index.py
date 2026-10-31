@@ -76,7 +76,7 @@ class SearchIndexTests(unittest.TestCase):
             item.write_text("supplier quotation", encoding="utf-8")
             app_data = root / "appdata"
             app_data.mkdir()
-            with patch.dict("os.environ", {"LOCALAPPDATA": str(app_data)}):
+            with patch.dict("os.environ", {"LOCALAPPDATA": str(app_data), "XDG_CONFIG_HOME": str(app_data)}):
                 save_custom_rules(app_data / "SmartDriveOrganizer" / "keyword_rules.json", [
                     {"name": "Quotations", "keywords": ["quotation"], "category": "Documents"}
                 ])
