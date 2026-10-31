@@ -11,8 +11,6 @@
 
 ## 0.6.0 — Local search, adaptive memory and duplicate intelligence
 
-## 0.6.0 — Local search, adaptive memory and duplicate intelligence
-
 - Added bounded local text extraction for PDF text layers, DOCX, XLSX/XLSM, PPTX, EML, Outlook MSG, common text/code formats, CSV/TSV, HTML/XML and RTF.
 - Added a local SQLite/FTS5 index for file metadata and extracted text; unchanged files are not re-indexed when size and modified time match.
 - Added a Google-style search dashboard with filename/content search, location, file family, extension, topic, modified-date and size filters, plus Open and Show in folder actions.
