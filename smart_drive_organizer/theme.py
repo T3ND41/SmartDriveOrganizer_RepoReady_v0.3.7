@@ -16,6 +16,20 @@ LIGHT = {
     "trough": "#E5E5E5",
     "badge": "#FEE2E2",
 }
+REDLINE = {
+    "bg": "#101010",
+    "card": "#191919",
+    "ink": "#FFFFFF",
+    "black": "#000000",
+    "white": "#FFFFFF",
+    "red": "#D71920",
+    "muted": "#C4C4C4",
+    "border": "#4B2527",
+    "hover": "#292929",
+    "disabled": "#5A292B",
+    "trough": "#3D1719",
+    "badge": "#351316",
+}
 DARK = {
     "bg": "#151515",
     "card": "#242424",
@@ -34,7 +48,12 @@ DARK = {
 
 def palette_for(parent: Any) -> dict[str, str]:
     """Return the application's persisted palette for any child dialog."""
-    return DARK if getattr(parent, "theme_name", "light") == "dark" else LIGHT
+    selected = getattr(parent, "theme_name", "light")
+    if selected == "dark":
+        return DARK
+    if selected == "redline":
+        return REDLINE
+    return LIGHT
 
 
 def apply_dialog_theme(widget: Any, parent: Any) -> dict[str, str]:
