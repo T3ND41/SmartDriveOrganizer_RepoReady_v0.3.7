@@ -1,6 +1,6 @@
 ## 0.7.0 — Branded workspace, live progress and safer duplicate review
 
-- Applied the supplied split red/black face-and-skull mark and both supplied light/dark feature icon atlases to the application UI.
+- Applied the supplied split red/black face-and-skull mark, matching Windows executable icon and both supplied light/dark feature icon atlases to the application UI.
 - Added persistent Light, Dark and Redline themes using the official red `#D71920`, black `#101010` and white `#FFFFFF` palette.
 - Added a logo-centered circular progress indicator showing selected-drive coverage, files found versus examined, match rate, active search terms and matched groups.
 - Kept Pause, Resume and Cancel controls available across recursive scanning, local full-text indexing, duplicate analysis, Copy/Move application and Move undo. Pause and cancellation are cooperative and occur at safe checkpoints.
