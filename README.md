@@ -1,10 +1,32 @@
-# Smart Drive Organizer — v0.6.0
+# Smart Drive Organizer — v0.7.0
 
-**Safe deep search, recurring-pattern discovery, reviewable grouping and persistent rules**
+**Branded intelligent file search, safe discovery and reviewable organization**
 
 A local-first Windows file organizer with a redesigned desktop workspace, custom keyword routing, multi-drive scanning, persistent rules and optional background monitoring.
 
-**Brand system:** black `#101010`, red `#D71920`, and white `#FFFFFF`. The supplied monochrome face-and-skull artwork is the application mark.
+**Brand system:** black `#101010`, red `#D71920`, and white `#FFFFFF`. The supplied split red/black face-and-skull master mark and dark navigation icons are bundled with the application. Light and Dark themes are selectable and saved locally.
+
+## v0.7.0 — Branded workspace, progress control and safer duplicate review
+
+- Applied the supplied master logo, brand palette and supplied dark navigation icon artwork. Added persistent Light and Dark themes across the main workspace and secondary settings/search dialogs.
+- Added the master logo beside scan progress counters: completed drives and percentage, files found versus files examined, match rate, classified topic counts and newly discovered filename phrases.
+- Added Pause, Resume and Cancel controls to recursive scans, full-text indexing, duplicate comparison, file application and undo. Operations pause at safe checkpoints; completed file actions remain in the existing audit journal.
+- Added colour-coded duplicate findings and side-by-side review cards for the older/newer copies.
+- Added a confirmation-only action for exact duplicates. It re-hashes the chosen keeper and each older copy immediately before sending older exact copies to the OS Recycle Bin. Possible versions and near-matches cannot use this action. No automatic or permanent delete is performed.
+- Updated the one-line PowerShell launcher to detect a per-user app copy and portable runtime, avoid opening a second running instance, compare the installed version with the latest stable GitHub Release, and ask before updating an older version in place.
+- Bundled supplied navigation icon assets and master artwork in the Windows executable.
+
+### Pause and resume behaviour
+
+Pause and Resume are available while the application is scanning, indexing, analysing duplicates, applying a file plan or undoing a Move. Cancel stops at the next safe checkpoint. A cancelled scan displays partial information but cannot be applied as a completed organization plan. A cancelled Move/apply job records completed actions in its journal and never silently rolls them back.
+
+### Duplicate handling
+
+Exact duplicates are byte-for-byte matches verified using SHA-256. The default action keeps the newest modified copy and offers older exact copies for confirmation before sending them to the Recycle Bin. The app checks the SHA-256 values again immediately before each action. Filename versions and near-identical documents remain review-only and are never eligible for this action.
+
+### Version-aware portable launcher
+
+Use the one-line command under **Run without installing**. It checks for an existing per-user copy in `%LOCALAPPDATA%\\Programs\\SmartDriveOrganizer` and portable copies under `%LOCALAPPDATA%\\SmartDriveOrganizer\\PortableRuntime`. If a current version is already present, it launches that copy. If an older copy is found, it offers an update and updates that same folder rather than creating another application folder. The launcher will not replace an executable while Smart Drive Organizer is running.
 
 ## Optional conventional installer
 
@@ -52,7 +74,7 @@ This is an intentionally safe deep search of accessible personal/work files on t
 - Extracts text from PDF text layers, DOCX, XLSX/XLSM, PPTX, plain text, CSV/TSV, HTML/XML, RTF, source-code text, EML email and Outlook MSG email.
 - Outlook MSG extraction uses the optional `extract-msg` parser, included in the Windows build.
 - Document extraction is bounded to protect memory and scan time. Very large or encrypted files, damaged documents and formats without a supported parser may be indexed by name/metadata only.
-- Legacy binary Office files (`.doc`, `.xls`, `.ppt`) are listed and searchable by filename/metadata, but their internal text is not currently extracted. Image-only/scanned PDFs require OCR, which is not part of this release.
+- Legacy binary Office files (`.doc`, `.xls`, `.ppt`) can be read through the installed Microsoft Office desktop applications on Windows using read-only automation with macros and external workbook link updates disabled. This requires Microsoft Office to already be installed; without it, these files remain searchable by filename/metadata. Image-only/scanned PDFs require OCR, which is not part of this release.
 
 ### Adaptive local memory
 - Approved discovery groups, rejected suggestions and filing corrections are saved in `learning_memory.json` on this device.
@@ -65,7 +87,7 @@ This is an intentionally safe deep search of accessible personal/work files on t
 ### Duplicate and version review
 - **Find duplicates & versions** in the search dashboard checks indexed files for exact SHA-256 duplicates, likely filename revisions/copies and very high text overlap between supported documents.
 - Findings show the files and why they were grouped. Similarity and version grouping are heuristic suggestions; inspect the documents before deciding what to keep.
-- This tool is inspection-only. It does not delete, overwrite, merge, rename or move duplicates.
+- Findings are inspection-only until you choose an action. Only exact SHA-256 duplicate groups offer a confirmation to keep the newest modified copy and send older exact copies to the OS Recycle Bin. The app re-verifies hashes immediately before each action. Near-matches and possible versions cannot be recycled from this screen; there is no permanent-delete or automatic cleanup.
 
 ## Features
 
