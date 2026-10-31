@@ -1,3 +1,16 @@
+## 0.7.0 — Brand refresh, operation controls and duplicate safety
+
+- Bundled the supplied split red/black master mark and six supplied navigation icons; added persistent Light and Dark themes to the main window, search, duplicate review, learning memory, automation, topic and GitHub settings dialogs.
+- Added the master mark beside the main progress counters, with completed drive percentage, examined/found file counts, match rate, classified topic counts and newly discovered filename phrases.
+- Added cooperative Pause, Resume and Cancel controls to recursive multi-drive scanning, local indexing, duplicate analysis, safe Copy/Move application and Move undo. Pauses occur at safe checkpoints; cancelled scans cannot be applied as complete plans.
+- Added explicit scan cancellation regression coverage and thread-safe pause/resume controller tests.
+- Highlighted duplicate findings by type and added side-by-side inspection cards for duplicate file versions/copies.
+- Added a user-confirmed Recycle Bin action for SHA-256 exact duplicates only. The selected newest modified file is kept; each proposed older copy and the keeper are re-hashed immediately before the Recycle Bin action. Near-matches and possible versions are never eligible.
+- Updated the no-install PowerShell launcher to detect an existing per-user copy or portable runtime, avoid starting a second running instance, compare local and latest GitHub release versions, ask before updating, and update the existing folder in place rather than creating a new application folder.
+- Added tests for exact-duplicate recycling, changed-after-review safety, non-exact group rejection, and pause/resume/cancel behaviour.
+
+## 0.6.0 — Local search, adaptive memory and duplicate intelligence
+
 ## 0.6.0 — Local search, adaptive memory and duplicate intelligence
 
 - Added bounded local text extraction for PDF text layers, DOCX, XLSX/XLSM, PPTX, EML, Outlook MSG, common text/code formats, CSV/TSV, HTML/XML and RTF.
