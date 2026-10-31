@@ -49,36 +49,29 @@ NAV_FEATURE_ICONS = {
 
 
 def load_feature_icon_atlas(parent: tk.Misc, theme_name: str) -> tuple[tk.PhotoImage | None, dict[str, tk.PhotoImage]]:
-    """Load the supplied brand icon atlas and crop its twelve 32px feature marks."""
-    # Use the verified supplied light atlas as the source in every theme;
-    # dark variants are recoloured below because the bundled dark atlas is blank.
-    atlas_path = Path(__file__).resolve().parent / "assets" / "feature_icons_light.png"
+    """Load approved brand icons, using transparent dark variants where supplied."""
+    assets_dir = Path(__file__).resolve().parent / "assets"
+    atlas_path = assets_dir / "feature_icons_light.png"
     try:
-        source_atlas = tk.PhotoImage(master=parent, file=str(atlas_path))
+        atlas = tk.PhotoImage(master=parent, file=str(atlas_path))
     except (tk.TclError, OSError):
         return None, {}
-    atlas = source_atlas
-    if theme_name != "light":
-        # Recolour the approved light glyphs for reliable contrast on dark sidebars.
-        # Keep transparent pixels and the red brand accents unchanged.
-        atlas = source_atlas.copy()
-        for y in range(source_atlas.height()):
-            for x in range(source_atlas.width()):
-                if source_atlas.transparency_get(x, y):
-                    continue
-                red, green, blue = source_atlas.get(x, y)
-                is_brand_red = red > 150 and red > green * 1.4 and red > blue * 1.4
-                if not is_brand_red:
-                    atlas.put("#FFFFFF", to=(x, y))
     icons: dict[str, tk.PhotoImage] = {}
+    dark_dir = assets_dir / "icons" / "dark"
     for index, name in enumerate(FEATURE_ICON_ORDER):
+        dark_icon_path = dark_dir / f"{name}.png"
+        if theme_name != "light" and dark_icon_path.is_file():
+            try:
+                icons[name] = tk.PhotoImage(master=parent, file=str(dark_icon_path))
+                continue
+            except (tk.TclError, OSError):
+                pass
         x, y = (index % 4) * 32, (index // 4) * 32
         icon = tk.PhotoImage(master=parent, width=32, height=32)
-        # Tk PhotoImage.copy() does not expose the Tcl -from option.
+        # Use Tk's native crop command so PNG transparency is retained.
         icon.tk.call(icon, "copy", atlas, "-from", x, y, x + 32, y + 32)
         icons[name] = icon
     return atlas, icons
-
 
 def app_data_dir() -> Path:
     if os.name == "nt":
