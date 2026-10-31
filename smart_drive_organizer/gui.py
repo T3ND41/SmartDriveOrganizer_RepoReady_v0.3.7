@@ -189,6 +189,13 @@ class OrganizerApp(tk.Tk):
         self.configure(bg=bg)
         self.feature_icon_atlas, self.feature_icons = load_feature_icon_atlas(self, self.theme_name)
 
+        def feature_button(parent: tk.Misc, feature: str, **options) -> ttk.Button:
+            icon = self.feature_icons.get(feature)
+            if icon is not None:
+                options["image"] = icon
+                options["compound"] = "left"
+            return ttk.Button(parent, **options)
+
         shell = tk.Frame(self, bg=bg)
         shell.pack(fill="both", expand=True)
         sidebar = tk.Frame(shell, bg=black, width=218)
@@ -330,7 +337,7 @@ class OrganizerApp(tk.Tk):
         type_buttons.grid(row=5, column=0, columnspan=2, sticky="w", pady=(9, 2))
         ttk.Button(type_buttons, text="Select all", style="Secondary.TButton", command=lambda: self._select_categories(True)).pack(side="left")
         ttk.Button(type_buttons, text="Clear", style="Secondary.TButton", command=lambda: self._select_categories(False)).pack(side="left", padx=(6, 0))
-        ttk.Button(type_buttons, text="Choose formats…", style="Dark.TButton", command=self._choose_file_formats).pack(side="left", padx=(6, 0))
+        feature_button(type_buttons, "extension-filter", text="Choose formats…", style="Dark.TButton", command=self._choose_file_formats).pack(side="left", padx=(6, 0))
         ttk.Label(filetypes, textvariable=self.file_format_summary_var, style="Muted.TLabel", wraplength=480).grid(row=6, column=0, columnspan=2, sticky="w", pady=(7, 0))
 
         action = ttk.LabelFrame(options, text="03   ORGANIZATION OPTIONS", style="Card.TLabelframe", padding=13)
@@ -356,22 +363,22 @@ class OrganizerApp(tk.Tk):
 
         controls = ttk.Frame(content, style="Page.TFrame")
         controls.pack(fill="x", pady=(0, 12))
-        self.scan_button = ttk.Button(controls, text="SCAN & PREVIEW", style="Primary.TButton", command=self._scan)
+        self.scan_button = feature_button(controls, "pattern-scan", text="SCAN & PREVIEW", style="Primary.TButton", command=self._scan)
         self.scan_button.pack(side="left")
         self.pause_button = ttk.Button(controls, text="Pause", style="Secondary.TButton", command=self._toggle_pause, state="disabled")
         self.pause_button.pack(side="left", padx=(8, 0))
         self.cancel_button = ttk.Button(controls, text="Cancel job", style="Secondary.TButton", command=self._cancel_job, state="disabled")
         self.cancel_button.pack(side="left", padx=(6, 0))
-        self.discovery_button = ttk.Button(controls, text="Review discovered groups", style="Secondary.TButton", command=self._review_discoveries, state="disabled")
+        self.discovery_button = feature_button(controls, "smart-grouping", text="Review discovered groups", style="Secondary.TButton", command=self._review_discoveries, state="disabled")
         self.discovery_button.pack(side="left", padx=(8, 0))
-        self.teach_button = ttk.Button(controls, text="Teach selected file", style="Secondary.TButton", command=self._teach_selected_file, state="disabled")
+        self.teach_button = feature_button(controls, "persistent-rules", text="Teach selected file", style="Secondary.TButton", command=self._teach_selected_file, state="disabled")
         self.teach_button.pack(side="left", padx=(8, 0))
-        self.apply_button = ttk.Button(controls, text="APPLY ORGANIZATION", style="Dark.TButton", command=self._apply, state="disabled")
+        self.apply_button = feature_button(controls, "copy-mode", text="APPLY ORGANIZATION", style="Dark.TButton", command=self._apply, state="disabled")
         self.apply_button.pack(side="left", padx=(8, 0))
         self.undo_button = ttk.Button(controls, text="Undo last move", style="Secondary.TButton", command=self._undo)
         self.undo_button.pack(side="left", padx=(8, 0))
         ttk.Button(controls, text="Undo automatic move", style="Secondary.TButton", command=self._undo_auto_move).pack(side="left", padx=(6, 0))
-        self.automation_button = ttk.Button(controls, text="Start monitor", style="Secondary.TButton", command=self._toggle_automation)
+        self.automation_button = feature_button(controls, "background-monitor", text="Start monitor", style="Secondary.TButton", command=self._toggle_automation)
         self.automation_button.pack(side="left", padx=(8, 0))
         ttk.Button(controls, text="Open destination", style="Secondary.TButton", command=self._open_output).pack(side="right")
 
