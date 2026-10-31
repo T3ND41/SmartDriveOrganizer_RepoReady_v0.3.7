@@ -243,6 +243,20 @@ class SearchIndex:
         ).fetchall()
         return [dict(row) for row in rows]
 
+    def remove_path(self, path: Path, commit: bool = True) -> bool:
+        """Remove one path from the local metadata and FTS tables."""
+        resolved = str(Path(path).expanduser().resolve())
+        row = self.db.execute("SELECT id FROM indexed_files WHERE path=?", (resolved,)).fetchone()
+        if row is None:
+            return False
+        row_id = int(row["id"])
+        if self.fts_available:
+            self.db.execute("DELETE FROM file_fts WHERE rowid=?", (row_id,))
+        self.db.execute("DELETE FROM indexed_files WHERE id=?", (row_id,))
+        if commit:
+            self.db.commit()
+        return True
+
     def remove_missing(self) -> int:
         rows = self.db.execute("SELECT id,path FROM indexed_files").fetchall()
         missing = [(row["id"], row["path"]) for row in rows if not Path(row["path"]).is_file()]
