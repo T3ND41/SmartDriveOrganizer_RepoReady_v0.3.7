@@ -30,6 +30,7 @@ from .search_dashboard import SearchDashboardDialog
 from .memory_ui import LearningMemoryDialog
 from .search_index import sync_journal_actions
 from .operation_control import OperationCancelled, OperationControl
+from .update_check import check_latest_release
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
@@ -43,7 +44,7 @@ NAV_FEATURE_ICONS = {
     "types": "extension-filter", "document": "extension-filter",
     "tag": "keyword-routing", "search": "deep-search",
     "memory": "persistent-rules", "gear": "background-monitor",
-    "activity": "pattern-scan", "branch": "workspace", "grid": "workspace",
+    "activity": "pattern-scan", "branch": "workspace", "grid": "workspace", "updates": "workspace",
 }
 
 
@@ -136,6 +137,7 @@ class OrganizerApp(tk.Tk):
         self.progress_var = tk.DoubleVar(value=0)
         self.active_search_terms: list[str] = []
         self.automation_status_var = tk.StringVar(value="Automatic monitor: not running")
+        self.update_checking = False
 
         self.plan: Optional[ScanPlan] = None
         self.events: queue.Queue = queue.Queue()
@@ -235,6 +237,7 @@ class OrganizerApp(tk.Tk):
         nav_button("Automation settings", self._open_automation_settings, "gear")
         nav_button("Activity log", self._open_activity_log, "activity")
         nav_button("GitHub publishing", self._open_github_publisher, "branch")
+        nav_button("Check for updates", self._check_for_updates, "updates")
         tk.Frame(sidebar, bg="#404040", height=1).pack(fill="x", padx=18, pady=(22, 14))
         tk.Label(sidebar, text="PRIVATE BY DESIGN", bg=black, fg=white, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=20)
         tk.Label(sidebar, text="Your files stay on this computer. Nothing changes until you review and confirm.",
@@ -779,6 +782,32 @@ class OrganizerApp(tk.Tk):
                     self._set_busy(False)
                     self.status_var.set("The operation stopped. No unapproved changes were made.")
                     messagebox.showerror("Smart Drive Organizer", str(payload), parent=self)
+                elif event == "update_check_done":
+                    self.update_checking = False
+                    result = payload
+                    latest = str(result.get("latest_version", "unknown"))
+                    current = str(result.get("current_version", __version__))
+                    if result.get("update_available"):
+                        self.status_var.set(f"Update available: {latest}")
+                        if messagebox.askyesno(
+                            "Smart Drive Organizer update available",
+                            f"You are running version {current}.\\n\\nVersion {latest} is available. "
+                            "Open the official GitHub release page?\\n\\n"
+                            "The app will not update itself or replace files while running.",
+                            parent=self,
+                        ):
+                            webbrowser.open(str(result["release_url"]))
+                    else:
+                        self.status_var.set(f"Smart Drive Organizer {latest} is up to date.")
+                        messagebox.showinfo(
+                            "Smart Drive Organizer is up to date",
+                            f"You are running version {current}. The latest published version is {latest}.",
+                            parent=self,
+                        )
+                elif event == "update_check_error":
+                    self.update_checking = False
+                    self.status_var.set("Could not check for updates. Check your internet connection and try again.")
+                    messagebox.showwarning("Update check unavailable", str(payload), parent=self)
                 elif event == "cancelled":
                     self._set_busy(False)
                     self.status_var.set("Operation cancelled at a safe checkpoint. Completed actions remain recorded.")
@@ -1078,6 +1107,23 @@ class OrganizerApp(tk.Tk):
             # The move journal is still the source of truth if the watcher index cannot be refreshed.
             pass
         return result
+
+    def _check_for_updates(self) -> None:
+        """Check the official GitHub release without blocking or replacing the running app."""
+        if self.update_checking:
+            return
+        self.update_checking = True
+        self.status_var.set("Checking the official Smart Drive Organizer release…")
+
+        def check() -> None:
+            try:
+                result = check_latest_release(__version__)
+            except Exception as error:
+                self.events.put(("update_check_error", str(error)))
+            else:
+                self.events.put(("update_check_done", result))
+
+        threading.Thread(target=check, name="sdo-update-check", daemon=True).start()
 
     def _open_activity_log(self) -> None:
         from .automation import app_data_dir
