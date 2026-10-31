@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smart-drive-organizer"
-version = "0.6.0"
-description = "Local-first file search, learning and safe file organization"
+version = "0.7.0"
+description = "Local-first deep search, file discovery, learning and safe file organization"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
