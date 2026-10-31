@@ -27,6 +27,10 @@ Exact duplicates are byte-for-byte matches verified using SHA-256. The default a
 
 Use the one-line command under **Run without installing**. It checks for an existing per-user copy in `%LOCALAPPDATA%\\Programs\\SmartDriveOrganizer` and portable copies under `%LOCALAPPDATA%\\SmartDriveOrganizer\\PortableRuntime`. If a current version is already present, it launches that copy. If an older copy is found, it offers an update and updates that same folder rather than creating another application folder. The launcher will not replace an executable while Smart Drive Organizer is running.
 
+### Check for updates inside the app
+
+Choose **Check for updates** in the desktop navigation to compare the running version with the latest published GitHub Release. The check runs in the background and only contacts the official repository release API. If a newer version exists, the app offers to open its official release page. It does not silently download, replace or restart the running application; use the version-aware launcher to perform an update safely.
+
 ## Optional conventional installer
 
 The no-install PowerShell launcher is recommended. The conventional per-user installer is still available separately:
