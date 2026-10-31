@@ -65,6 +65,8 @@ class DuplicateReviewDialog(tk.Toplevel):
         style.configure("Treeview", rowheight=27, font=("Segoe UI", 9), background=card, fieldbackground=card, foreground=ink)
         style.configure("Treeview.Heading", background=black, foreground=white, font=("Segoe UI", 9, "bold"), padding=7)
         style.configure("Primary.TButton", background=red, foreground=white, font=("Segoe UI", 9, "bold"), padding=9)
+        style.configure("Exact.TLabelframe", background=card, bordercolor=red, borderwidth=2, relief="solid")
+        style.configure("Exact.TLabelframe.Label", background=card, foreground=red, font=("Segoe UI", 9, "bold"))
         outer = ttk.Frame(self, padding=14); outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="Review possible duplicates and revisions", style="Title.TLabel").pack(anchor="w")
         coverage = (
@@ -89,18 +91,29 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.file_list.pack(fill="x", expand=False)
         self.compare_frame = ttk.Frame(details)
         self.compare_frame.pack(fill="both", expand=True, pady=(8, 0))
-        self.compare_vars = [tk.StringVar(value="Select an exact duplicate group.") for _ in range(2)]
+        self.compare_vars = [tk.StringVar(value="Select a group to compare its files.") for _ in range(2)]
+        self.compare_cards = []
+        self.compare_titles = []
         for col in range(2):
-            card = ttk.LabelFrame(self.compare_frame, text=f"FILE {col + 1}", padding=6)
+            card = ttk.LabelFrame(self.compare_frame, text=f"FILE {col + 1}", padding=7)
             card.grid(row=0, column=col, sticky="nsew", padx=(0 if col == 0 else 5, 0))
+            title = ttk.Label(card, text=f"FILE {col + 1}", foreground=muted, font=("Segoe UI", 8, "bold"))
+            title.pack(anchor="w", pady=(0, 5))
             ttk.Label(card, textvariable=self.compare_vars[col], wraplength=205, justify="left").pack(anchor="w")
+            self.compare_cards.append(card)
+            self.compare_titles.append(title)
         self.compare_frame.columnconfigure(0, weight=1)
         self.compare_frame.columnconfigure(1, weight=1)
         ttk.Label(details, text="Exact matches are verified by SHA-256. No files are changed during review.", foreground=red, wraplength=420).pack(anchor="w", pady=(7, 0))
         self.active_group = None
+        self.tree.tag_configure("exact", background="#FEE2E2" if self.theme_name == "light" else "#4A171B", foreground="#7F1D1D" if self.theme_name == "light" else "#FFFFFF")
+        self.tree.tag_configure("version", background="#FEF3C7" if self.theme_name == "light" else "#45351A", foreground="#78350F" if self.theme_name == "light" else "#FFFFFF")
+        self.tree.tag_configure("near", background="#E0F2FE" if self.theme_name == "light" else "#183247", foreground="#075985" if self.theme_name == "light" else "#FFFFFF")
         for i, group in enumerate(self.groups):
             sim = "—" if group.get("similarity") is None else f"{group['similarity']:.0%}"
-            self.tree.insert("", "end", iid=str(i), values=(group["kind"], group["count"], sim, group["match"]))
+            kind = str(group.get("kind", ""))
+            tag = "exact" if kind == "Exact duplicates" else ("version" if "version" in kind.casefold() else "near")
+            self.tree.insert("", "end", iid=str(i), values=(kind, group["count"], sim, group["match"]), tags=(tag,))
         self.tree.bind("<<TreeviewSelect>>", self._select)
         self.file_list.bind("<Double-1>", lambda _e: self._open())
         actions = ttk.Frame(outer); actions.pack(fill="x", pady=(12, 0))
@@ -118,26 +131,48 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.active_files = []
         self.active_group = None
         self.recycle_button.configure(state="disabled")
-        for value in self.compare_vars:
-            value.set("Select an exact duplicate group to compare files side by side.")
+        for index, value in enumerate(self.compare_vars):
+            value.set("Select a group to compare its files side by side.")
+            self.compare_cards[index].configure(style="TLabelframe")
+            self.compare_titles[index].configure(foreground=muted, text=f"FILE {index + 1}")
         if not ids:
             return
         group = self.groups[int(ids[0])]
         self.active_group = group
         self.active_files = group.get("files", [])
-        for row in self.active_files:
-            self.file_list.insert("end", row["path"])
-        if group.get("kind") == "Exact duplicates" and len(self.active_files) >= 2:
+        exact_match = group.get("kind") == "Exact duplicates" and len(self.active_files) >= 2
+        for index, row in enumerate(self.active_files):
+            label = str(row["path"])
+            self.file_list.insert("end", label)
+            if exact_match:
+                self.file_list.itemconfig(index, background="#FEE2E2" if self.theme_name == "light" else "#4A171B",
+                                          foreground="#7F1D1D" if self.theme_name == "light" else "#FFFFFF")
+        if len(self.active_files) >= 2:
             ordered = sorted(self.active_files, key=lambda row: (float(row.get("modified_ts", 0) or 0), str(row.get("path", "")).casefold()))
-            for index, row in enumerate((ordered[0], ordered[-1])):
+            pair = (ordered[0], ordered[-1]) if exact_match else (self.active_files[0], self.active_files[1])
+            for index, row in enumerate(pair):
                 modified = row.get("modified_ts")
-                stamp = datetime.fromtimestamp(float(modified)).strftime("%Y-%m-%d %H:%M:%S") if modified else "Unknown"
+                try:
+                    stamp = datetime.fromtimestamp(float(modified)).strftime("%Y-%m-%d %H:%M:%S") if modified else "Unknown"
+                except (OSError, TypeError, ValueError, OverflowError):
+                    stamp = "Unknown"
+                role = ("OLDER EXACT COPY" if index == 0 else "NEWEST EXACT COPY • KEEP") if exact_match else f"RELATED FILE {index + 1}"
+                digest = str(group.get("hash", ""))
+                hash_line = f"\nSHA-256: {digest[:20]}…" if exact_match and digest else ""
                 self.compare_vars[index].set(
-                    f"{row.get('name','')}\n\nModified: {stamp}\nSize: {_size(row.get('size_bytes',0))}\n\n{row.get('path','')}"
+                    f"{row.get('name','')}\n\n{role}\nModified: {stamp}\nSize: {_size(row.get('size_bytes',0))}"
+                    f"{hash_line}\n\nOriginal location:\n{row.get('path','')}"
                 )
-            if len(ordered) > 2:
-                self.compare_vars[1].set(self.compare_vars[1].get() + f"\n\nPlus {len(ordered)-2:,} older exact copy/copies.")
-            self.recycle_button.configure(state="normal")
+                if exact_match:
+                    self.compare_cards[index].configure(style="Exact.TLabelframe")
+                    self.compare_titles[index].configure(
+                        foreground=red,
+                        text="OLDER COPY • REVIEW" if index == 0 else "NEWEST COPY • KEEP",
+                    )
+            if exact_match:
+                if len(ordered) > 2:
+                    self.compare_vars[1].set(self.compare_vars[1].get() + f"\n\nPlus {len(ordered)-2:,} additional older exact copy/copies.")
+                self.recycle_button.configure(state="normal")
 
     def _recycle_older(self) -> None:
         group = self.active_group
