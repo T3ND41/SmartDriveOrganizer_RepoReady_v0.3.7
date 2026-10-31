@@ -53,9 +53,22 @@ def load_feature_icon_atlas(parent: tk.Misc, theme_name: str) -> tuple[tk.PhotoI
     theme_folder = "light" if theme_name == "light" else "dark"
     atlas_path = Path(__file__).resolve().parent / "assets" / f"feature_icons_{theme_folder}.png"
     try:
-        atlas = tk.PhotoImage(master=parent, file=str(atlas_path))
+        source_atlas = tk.PhotoImage(master=parent, file=str(atlas_path))
     except (tk.TclError, OSError):
         return None, {}
+    atlas = source_atlas
+    if theme_name != "light":
+        # Recolour the approved light glyphs for reliable contrast on dark sidebars.
+        # Keep transparent pixels and the red brand accents unchanged.
+        atlas = source_atlas.copy()
+        for y in range(source_atlas.height()):
+            for x in range(source_atlas.width()):
+                if source_atlas.transparency_get(x, y):
+                    continue
+                red, green, blue = source_atlas.get(x, y)
+                is_brand_red = red > 150 and red > green * 1.4 and red > blue * 1.4
+                if not is_brand_red:
+                    atlas.put("#FFFFFF", to=(x, y))
     icons: dict[str, tk.PhotoImage] = {}
     for index, name in enumerate(FEATURE_ICON_ORDER):
         x, y = (index % 4) * 32, (index // 4) * 32
