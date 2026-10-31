@@ -2,6 +2,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 from .models import DiscoveryGroup
+from .theme import apply_dialog_theme
 
 class DiscoveryReviewDialog(tk.Toplevel):
     """Review, rename and approve recurring filename patterns."""
@@ -13,18 +14,10 @@ class DiscoveryReviewDialog(tk.Toplevel):
         self.transient(parent); self.grab_set()
         self.groups=list(groups); self.names=[g.suggested_name for g in groups]
         self.result=None
-        bg,black,white,red="#F4F4F5","#101010","#FFFFFF","#D71920"
-        self.configure(bg=bg)
-        style=ttk.Style(self)
-        try: style.theme_use("clam")
-        except tk.TclError: pass
-        style.configure("TFrame",background=bg)
-        style.configure("TLabel",background=bg,foreground=black,font=("Segoe UI",9))
-        style.configure("Title.TLabel",background=bg,foreground=black,font=("Segoe UI",18,"bold"))
-        style.configure("TButton",font=("Segoe UI",9),padding=(9,7))
-        style.configure("Primary.TButton",background=red,foreground=white,font=("Segoe UI",9,"bold"),padding=(12,8))
-        style.configure("Treeview",rowheight=26,font=("Segoe UI",9))
-        style.configure("Treeview.Heading",background=black,foreground=white,font=("Segoe UI",9,"bold"),padding=7)
+        palette = apply_dialog_theme(self, parent)
+        style = ttk.Style(self)
+        style.configure("Title.TLabel", background=palette["bg"], foreground=palette["ink"], font=("Segoe UI", 18, "bold"))
+        style.configure("Primary.TButton", background=palette["red"], foreground=palette["white"], font=("Segoe UI", 9, "bold"), padding=(12, 8))
         outer=ttk.Frame(self,padding=14); outer.pack(fill="both",expand=True)
         ttk.Label(outer,text="Recurring file-name patterns",style="Title.TLabel").pack(anchor="w")
         ttk.Label(outer,text=(f"{len(groups)} suggestions found. Each pattern occurs in at least two distinct files. "
@@ -47,7 +40,7 @@ class DiscoveryReviewDialog(tk.Toplevel):
         ttk.Entry(pane,textvariable=self.name,width=30).pack(fill="x",pady=4)
         ttk.Button(pane,text="Update folder name",command=self._rename).pack(anchor="w",pady=(0,8))
         ttk.Label(pane,text="Example files / locations").pack(anchor="w")
-        self.examples=tk.Text(pane,width=31,height=12,wrap="word",font=("Segoe UI",8))
+        self.examples=tk.Text(pane,width=31,height=12,wrap="word",font=("Segoe UI",8),bg=palette["card"],fg=palette["ink"],insertbackground=palette["ink"],selectbackground=palette["red"],selectforeground=palette["white"])
         self.examples.pack(fill="both",expand=True)
         self.examples.configure(state="disabled")
         actions=ttk.Frame(outer); actions.pack(fill="x",pady=(10,0))

@@ -13,7 +13,7 @@ from tkinter import messagebox, ttk
 from .duplicates import analyze_duplicates, recycle_exact_duplicates
 from .search_index import SearchIndex, build_index
 from .operation_control import OperationCancelled, OperationControl
-from .theme import palette_for
+from .theme import apply_dialog_theme
 
 
 def _open_path(path: Path) -> None:
@@ -50,7 +50,9 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.grab_set()
         self.groups = result.get("exact", []) + result.get("versions", []) + result.get("near", [])
         self.active_files: list[dict] = []
-        palette = palette_for(parent)
+        palette = apply_dialog_theme(self, parent)
+        self.brand_palette = palette
+        self.theme_name = getattr(parent, "theme_name", "light")
         bg, card, ink, black, white, red, muted = (
             palette["bg"], palette["card"], palette["ink"], palette["black"],
             palette["white"], palette["red"], palette["muted"],
@@ -87,7 +89,7 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.tree.pack(side="left", fill="both", expand=True); scroll.pack(side="right", fill="y")
         details = ttk.LabelFrame(body, text="Files in selected group", padding=8)
         details.pack(side="left", fill="both", padx=(10, 0))
-        self.file_list = tk.Listbox(details, width=52, height=8, font=("Segoe UI", 8), selectbackground=red, selectforeground=white)
+        self.file_list = tk.Listbox(details, width=52, height=8, font=("Segoe UI", 8), bg=card, fg=ink, selectbackground=red, selectforeground=white, highlightthickness=1, highlightbackground=palette["border"])
         self.file_list.pack(fill="x", expand=False)
         self.compare_frame = ttk.Frame(details)
         self.compare_frame.pack(fill="both", expand=True, pady=(8, 0))
@@ -106,9 +108,9 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.compare_frame.columnconfigure(1, weight=1)
         ttk.Label(details, text="Exact matches are verified by SHA-256. No files are changed during review.", foreground=red, wraplength=420).pack(anchor="w", pady=(7, 0))
         self.active_group = None
-        self.tree.tag_configure("exact", background="#FEE2E2" if self.theme_name == "light" else "#4A171B", foreground="#7F1D1D" if self.theme_name == "light" else "#FFFFFF")
-        self.tree.tag_configure("version", background="#FEF3C7" if self.theme_name == "light" else "#45351A", foreground="#78350F" if self.theme_name == "light" else "#FFFFFF")
-        self.tree.tag_configure("near", background="#E0F2FE" if self.theme_name == "light" else "#183247", foreground="#075985" if self.theme_name == "light" else "#FFFFFF")
+        self.tree.tag_configure("exact", background=palette["badge"], foreground=red)
+        self.tree.tag_configure("version", background=palette["border"], foreground=ink)
+        self.tree.tag_configure("near", background=palette["bg"], foreground=muted)
         for i, group in enumerate(self.groups):
             sim = "—" if group.get("similarity") is None else f"{group['similarity']:.0%}"
             kind = str(group.get("kind", ""))
@@ -145,8 +147,7 @@ class DuplicateReviewDialog(tk.Toplevel):
             label = str(row["path"])
             self.file_list.insert("end", label)
             if exact_match:
-                self.file_list.itemconfig(index, background="#FEE2E2" if self.theme_name == "light" else "#4A171B",
-                                          foreground="#7F1D1D" if self.theme_name == "light" else "#FFFFFF")
+                self.file_list.itemconfig(index, background=self.brand_palette["badge"], foreground=self.brand_palette["red"])
         if len(self.active_files) >= 2:
             ordered = sorted(self.active_files, key=lambda row: (float(row.get("modified_ts", 0) or 0), str(row.get("path", "")).casefold()))
             pair = (ordered[0], ordered[-1]) if exact_match else (self.active_files[0], self.active_files[1])
@@ -252,7 +253,7 @@ class SearchDashboardDialog(tk.Toplevel):
         self.events: queue.Queue = queue.Queue()
         self.busy = False
         self.operation_control: OperationControl | None = None
-        palette = palette_for(parent)
+        palette = apply_dialog_theme(self, parent)
         bg, white, black, red, muted = (
             palette["bg"], palette["card"], palette["black"],
             palette["red"], palette["muted"],
@@ -260,6 +261,13 @@ class SearchDashboardDialog(tk.Toplevel):
         ink = palette["ink"]
         self.theme_name = getattr(parent, "theme_name", "light")
         self.configure(bg=bg)
+        self.feature_icons = getattr(parent, "feature_icons", {})
+        def feature_button(container: tk.Misc, feature: str, **options) -> ttk.Button:
+            icon = self.feature_icons.get(feature)
+            if icon is not None:
+                options["image"] = icon
+                options["compound"] = "left"
+            return ttk.Button(container, **options)
         style = ttk.Style(self)
         try: style.theme_use("clam")
         except tk.TclError: pass
@@ -270,7 +278,7 @@ class SearchDashboardDialog(tk.Toplevel):
         style.configure("TEntry", padding=8, fieldbackground=white, foreground=ink)
         style.configure("TButton", font=("Segoe UI", 9), padding=(10, 7))
         style.configure("Primary.TButton", background=red, foreground=white, font=("Segoe UI", 9, "bold"), padding=(14, 9))
-        style.map("Primary.TButton", background=[("active", "#B9151B")])
+        style.map("Primary.TButton", background=[("active", red)])
         style.configure("Treeview", rowheight=28, font=("Segoe UI", 9), background=white, fieldbackground=white, foreground=ink)
         style.configure("Treeview.Heading", background=black, foreground=white, font=("Segoe UI", 9, "bold"), padding=7)
 
@@ -283,8 +291,8 @@ class SearchDashboardDialog(tk.Toplevel):
         self.query_entry = ttk.Entry(search_row, textvariable=self.query_var, font=("Segoe UI", 13))
         self.query_entry.pack(side="left", fill="x", expand=True)
         self.query_entry.bind("<Return>", lambda _e: self._search())
-        ttk.Button(search_row, text="SEARCH", style="Primary.TButton", command=self._search).pack(side="left", padx=(8, 0))
-        ttk.Button(search_row, text="Build / refresh index", command=self._start_index).pack(side="left", padx=(8, 0))
+        feature_button(search_row, "deep-search", text="SEARCH", style="Primary.TButton", command=self._search).pack(side="left", padx=(8, 0))
+        feature_button(search_row, "deep-search", text="Build / refresh index", command=self._start_index).pack(side="left", padx=(8, 0))
 
         filters = ttk.LabelFrame(outer, text="FILTERS", padding=10)
         filters.pack(fill="x", pady=(0, 10))
@@ -311,7 +319,7 @@ class SearchDashboardDialog(tk.Toplevel):
         toolbar = ttk.Frame(outer); toolbar.pack(fill="x", pady=(0, 6))
         self.status_var = tk.StringVar(value="Build or refresh the local index to search file contents.")
         ttk.Label(toolbar, textvariable=self.status_var, style="Hint.TLabel").pack(side="left")
-        ttk.Button(toolbar, text="Find duplicates & versions", command=self._start_duplicates).pack(side="right")
+        feature_button(toolbar, "pattern-scan", text="Find duplicates & versions", command=self._start_duplicates).pack(side="right")
         self.cancel_button = ttk.Button(toolbar, text="Cancel", command=self._cancel_operation, state="disabled")
         self.cancel_button.pack(side="right", padx=(6, 0))
         self.pause_button = ttk.Button(toolbar, text="Pause", command=self._toggle_pause, state="disabled")

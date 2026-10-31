@@ -30,6 +30,7 @@ from .search_dashboard import SearchDashboardDialog
 from .memory_ui import LearningMemoryDialog
 from .search_index import sync_journal_actions
 from .operation_control import OperationCancelled, OperationControl
+from .theme import apply_dialog_theme
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
@@ -48,19 +49,29 @@ NAV_FEATURE_ICONS = {
 
 
 def load_feature_icon_atlas(parent: tk.Misc, theme_name: str) -> tuple[tk.PhotoImage | None, dict[str, tk.PhotoImage]]:
-    """Load the supplied brand icon atlas and crop its twelve 32px feature marks."""
-    theme_folder = "light" if theme_name == "light" else "dark"
-    atlas_path = Path(__file__).resolve().parent / "assets" / f"feature_icons_{theme_folder}.png"
+    """Load approved brand icons, using transparent dark variants where supplied."""
+    assets_dir = Path(__file__).resolve().parent / "assets"
+    atlas_path = assets_dir / "feature_icons_light.png"
     try:
         atlas = tk.PhotoImage(master=parent, file=str(atlas_path))
     except (tk.TclError, OSError):
         return None, {}
     icons: dict[str, tk.PhotoImage] = {}
+    dark_dir = assets_dir / "icons" / "dark"
     for index, name in enumerate(FEATURE_ICON_ORDER):
+        dark_icon_path = dark_dir / f"{name}.png"
+        if theme_name != "light" and dark_icon_path.is_file():
+            try:
+                icons[name] = tk.PhotoImage(master=parent, file=str(dark_icon_path))
+                continue
+            except (tk.TclError, OSError):
+                pass
         x, y = (index % 4) * 32, (index // 4) * 32
-        icons[name] = atlas.copy(from_coords=(x, y, x + 32, y + 32))
+        icon = tk.PhotoImage(master=parent, width=32, height=32)
+        # Use Tk's native crop command so PNG transparency is retained.
+        icon.tk.call(icon, "copy", atlas, "-from", x, y, x + 32, y + 32)
+        icons[name] = icon
     return atlas, icons
-
 
 def app_data_dir() -> Path:
     if os.name == "nt":
@@ -176,7 +187,7 @@ class OrganizerApp(tk.Tk):
         style.configure("TButton", font=("Segoe UI", 9), padding=(10, 7), background=card, foreground=ink)
         style.map("TButton", background=[("active", hover), ("disabled", disabled)])
         style.configure("Primary.TButton", font=("Segoe UI", 9, "bold"), padding=(16, 10), background=red, foreground=white)
-        style.map("Primary.TButton", background=[("active", "#B9151B"), ("disabled", "#8E5558" if self.theme_name in {"dark", "redline"} else "#E7A1A4")], foreground=[("disabled", white)])
+        style.map("Primary.TButton", background=[("active", "#D71920"), ("disabled", "#8E5558" if self.theme_name in {"dark", "redline"} else "#E7A1A4")], foreground=[("disabled", white)])
         style.configure("Dark.TButton", font=("Segoe UI", 9, "bold"), padding=(13, 9), background=black, foreground=white)
         style.map("Dark.TButton", background=[("active", "#333333"), ("disabled", "#777777")])
         style.configure("Secondary.TButton", font=("Segoe UI", 9), padding=(10, 7), background=bg, foreground=ink)
@@ -188,33 +199,50 @@ class OrganizerApp(tk.Tk):
         self.configure(bg=bg)
         self.feature_icon_atlas, self.feature_icons = load_feature_icon_atlas(self, self.theme_name)
 
+        def feature_button(parent: tk.Misc, feature: str, **options) -> ttk.Button:
+            icon = self.feature_icons.get(feature)
+            if icon is not None:
+                options["image"] = icon
+                options["compound"] = "left"
+            return ttk.Button(parent, **options)
+
         shell = tk.Frame(self, bg=bg)
         shell.pack(fill="both", expand=True)
         sidebar = tk.Frame(shell, bg=black, width=218)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
-        logo_path = Path(__file__).resolve().parent / "assets" / "brand_master.png"
+        assets_dir = Path(__file__).resolve().parent / "assets"
+        logo_path = assets_dir / "brand_master.png"
         try:
             self.brand_photo = tk.PhotoImage(file=str(logo_path))
             self.iconphoto(True, self.brand_photo)
-            tk.Label(sidebar, image=self.brand_photo, bg=black, borderwidth=0).pack(anchor="w", padx=20, pady=(22, 10))
         except (tk.TclError, OSError):
-            tk.Frame(sidebar, bg=red, width=52, height=5).pack(anchor="w", padx=20, pady=(34, 28))
-        tk.Label(sidebar, text="SMART DRIVE", bg=black, fg=white, font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=20)
-        tk.Label(sidebar, text="ORGANIZER", bg=black, fg=red, font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=20, pady=(0, 22))
+            # Never substitute a hand-drawn mark for the approved supplied logo.
+            self.brand_photo = None
+        wordmark_path = assets_dir / "brand_wordmark.png"
+        try:
+            self.brand_wordmark_photo = tk.PhotoImage(file=str(wordmark_path))
+            tk.Label(sidebar, image=self.brand_wordmark_photo, bg=black, borderwidth=0).pack(anchor="w", padx=20, pady=(22, 20))
+        except (tk.TclError, OSError):
+            self.brand_wordmark_photo = None
+        if os.name == "nt":
+            app_icon = assets_dir / "app_icon.ico"
+            if app_icon.is_file():
+                try:
+                    self.iconbitmap(default=str(app_icon))
+                except tk.TclError:
+                    pass
         tk.Frame(sidebar, bg=red, height=3).pack(fill="x", padx=20, pady=(0, 20))
         tk.Label(sidebar, text="WORKSPACE", bg=black, fg="#A3A3A3", font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=20, pady=(0, 8))
 
         self.nav_icon_photos = []
         def nav_icon(parent: tk.Misc, kind: str, background: str, accent: bool = False) -> tk.Widget:
             asset_name = NAV_FEATURE_ICONS.get(kind, "workspace")
-            photo = self.feature_icons.get(asset_name)
+            photo = self.feature_icons.get(asset_name) or self.feature_icons.get("workspace")
             if photo is not None:
                 return tk.Label(parent, image=photo, bg=background, borderwidth=0)
-            canvas = tk.Canvas(parent, width=24, height=24, bg=background, highlightthickness=0, borderwidth=0)
-            canvas.create_oval(4, 4, 20, 20, outline=white, width=1.7)
-            canvas.create_oval(9, 9, 15, 15, fill=red, outline=red)
-            return canvas
+            # Do not draw substitute symbols when a supplied feature icon is unavailable.
+            return tk.Label(parent, text="", bg=background, width=4, borderwidth=0)
 
         def nav_button(label: str, command: Callable[[], None], icon: str, accent: bool = False) -> None:
             button_bg = red if accent else black
@@ -223,7 +251,7 @@ class OrganizerApp(tk.Tk):
             nav_icon(holder, icon, button_bg, accent).pack(side="left", padx=(14, 7), pady=7)
             tk.Button(holder, text=label, command=command, anchor="w", padx=3, pady=11, relief="flat",
                 borderwidth=0, cursor="hand2", bg=button_bg, fg=white,
-                activebackground="#B9151B" if accent else "#262626", activeforeground=white,
+                activebackground=red if accent else "#101010", activeforeground=white,
                 font=("Segoe UI", 9, "bold" if accent else "normal"), highlightthickness=0).pack(side="left", fill="x", expand=True)
 
         nav_button("Overview", lambda: self._scroll_to_section("overview"), "grid")
@@ -320,7 +348,7 @@ class OrganizerApp(tk.Tk):
         type_buttons.grid(row=5, column=0, columnspan=2, sticky="w", pady=(9, 2))
         ttk.Button(type_buttons, text="Select all", style="Secondary.TButton", command=lambda: self._select_categories(True)).pack(side="left")
         ttk.Button(type_buttons, text="Clear", style="Secondary.TButton", command=lambda: self._select_categories(False)).pack(side="left", padx=(6, 0))
-        ttk.Button(type_buttons, text="Choose formats…", style="Dark.TButton", command=self._choose_file_formats).pack(side="left", padx=(6, 0))
+        feature_button(type_buttons, "extension-filter", text="Choose formats…", style="Dark.TButton", command=self._choose_file_formats).pack(side="left", padx=(6, 0))
         ttk.Label(filetypes, textvariable=self.file_format_summary_var, style="Muted.TLabel", wraplength=480).grid(row=6, column=0, columnspan=2, sticky="w", pady=(7, 0))
 
         action = ttk.LabelFrame(options, text="03   ORGANIZATION OPTIONS", style="Card.TLabelframe", padding=13)
@@ -346,22 +374,22 @@ class OrganizerApp(tk.Tk):
 
         controls = ttk.Frame(content, style="Page.TFrame")
         controls.pack(fill="x", pady=(0, 12))
-        self.scan_button = ttk.Button(controls, text="SCAN & PREVIEW", style="Primary.TButton", command=self._scan)
+        self.scan_button = feature_button(controls, "pattern-scan", text="SCAN & PREVIEW", style="Primary.TButton", command=self._scan)
         self.scan_button.pack(side="left")
         self.pause_button = ttk.Button(controls, text="Pause", style="Secondary.TButton", command=self._toggle_pause, state="disabled")
         self.pause_button.pack(side="left", padx=(8, 0))
         self.cancel_button = ttk.Button(controls, text="Cancel job", style="Secondary.TButton", command=self._cancel_job, state="disabled")
         self.cancel_button.pack(side="left", padx=(6, 0))
-        self.discovery_button = ttk.Button(controls, text="Review discovered groups", style="Secondary.TButton", command=self._review_discoveries, state="disabled")
+        self.discovery_button = feature_button(controls, "smart-grouping", text="Review discovered groups", style="Secondary.TButton", command=self._review_discoveries, state="disabled")
         self.discovery_button.pack(side="left", padx=(8, 0))
-        self.teach_button = ttk.Button(controls, text="Teach selected file", style="Secondary.TButton", command=self._teach_selected_file, state="disabled")
+        self.teach_button = feature_button(controls, "persistent-rules", text="Teach selected file", style="Secondary.TButton", command=self._teach_selected_file, state="disabled")
         self.teach_button.pack(side="left", padx=(8, 0))
-        self.apply_button = ttk.Button(controls, text="APPLY ORGANIZATION", style="Dark.TButton", command=self._apply, state="disabled")
+        self.apply_button = feature_button(controls, "copy-mode", text="APPLY ORGANIZATION", style="Dark.TButton", command=self._apply, state="disabled")
         self.apply_button.pack(side="left", padx=(8, 0))
         self.undo_button = ttk.Button(controls, text="Undo last move", style="Secondary.TButton", command=self._undo)
         self.undo_button.pack(side="left", padx=(8, 0))
         ttk.Button(controls, text="Undo automatic move", style="Secondary.TButton", command=self._undo_auto_move).pack(side="left", padx=(6, 0))
-        self.automation_button = ttk.Button(controls, text="Start monitor", style="Secondary.TButton", command=self._toggle_automation)
+        self.automation_button = feature_button(controls, "background-monitor", text="Start monitor", style="Secondary.TButton", command=self._toggle_automation)
         self.automation_button.pack(side="left", padx=(8, 0))
         ttk.Button(controls, text="Open destination", style="Secondary.TButton", command=self._open_output).pack(side="right")
 
@@ -1149,6 +1177,7 @@ class OrganizerApp(tk.Tk):
         dialog.transient(self)
         dialog.grab_set()
         dialog.resizable(False, False)
+        apply_dialog_theme(dialog, self)
         frame = ttk.Frame(dialog, padding=16)
         frame.pack(fill="both", expand=True)
         name_var = tk.StringVar()

@@ -7,7 +7,7 @@ from pathlib import Path
 class BrandAssetTests(unittest.TestCase):
     def test_official_logo_and_both_feature_icon_atlases_are_bundled(self):
         assets = Path(__file__).resolve().parents[1] / "smart_drive_organizer" / "assets"
-        for name in ("brand_master.png", "feature_icons_light.png", "feature_icons_dark.png", "app_icon.ico"):
+        for name in ("brand_master.png", "brand_wordmark.png", "feature_icons_light.png", "feature_icons_dark.png", "app_icon.ico"):
             with self.subTest(asset=name):
                 path = assets / name
                 self.assertTrue(path.is_file(), f"Missing bundled brand asset: {name}")
