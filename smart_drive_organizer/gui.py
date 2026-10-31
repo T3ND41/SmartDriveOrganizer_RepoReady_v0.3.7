@@ -791,8 +791,8 @@ class OrganizerApp(tk.Tk):
                         self.status_var.set(f"Update available: {latest}")
                         if messagebox.askyesno(
                             "Smart Drive Organizer update available",
-                            f"You are running version {current}.\\n\\nVersion {latest} is available. "
-                            "Open the official GitHub release page?\\n\\n"
+                            f"You are running version {current}.\n\nVersion {latest} is available. "
+                            "Open the official GitHub release page?\n\n"
                             "The app will not update itself or replace files while running.",
                             parent=self,
                         ):
