@@ -11,8 +11,8 @@ permissions:
 
 jobs:
   tests:
-    name: Python tests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Python tests (\${{ matrix.os }})
+    runs-on: \${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -24,7 +24,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7.1.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: \${{ matrix.python-version }}
       - name: Install package and optional document readers
         run: |
           python -m pip install --upgrade pip
@@ -35,7 +35,7 @@ jobs:
         run: python -m unittest discover -s tests -v
 
   branded-ui-smoke:
-    name: Branded desktop UI smoke test (Windows)
+    name: Build branded Windows executable
     runs-on: windows-latest
     steps:
       - name: Check out source
@@ -65,14 +65,37 @@ jobs:
           --add-data "config;config"
           --add-data "smart_drive_organizer/assets;smart_drive_organizer/assets"
           run.py
-      - name: Launch app and capture Light, Dark and Redline screens
-        shell: pwsh
-        run: ./scripts/capture_brand_ui.ps1
-      - name: Upload branded UI screenshots and executable
+      - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:
-          name: smart-drive-organizer-branded-ui-review
-          path: |
-            brand-ui-screenshots/*.png
-            dist/SmartDriveOrganizer.exe
+          name: smart-drive-organizer-windows-build
+          path: dist/SmartDriveOrganizer.exe
+          if-no-files-found: error
+
+  branded-ui-screenshots:
+    name: Render branded UI themes on virtual desktop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install virtual display and screenshot tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xdotool imagemagick
+      - name: Install application
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[content]"
+          python -m pip install pillow
+      - name: Capture Light, Dark and Redline application windows
+        run: xvfb-run -a -s "-screen 0 1600x1200x24" python scripts/capture_brand_ui_linux.py
+      - name: Upload actual UI screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-drive-organizer-branded-ui-screenshots
+          path: brand-ui-screenshots/*.png
           if-no-files-found: error
