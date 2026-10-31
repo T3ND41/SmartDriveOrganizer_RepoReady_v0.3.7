@@ -199,3 +199,74 @@ def analyze_duplicates(database: Path | None = None,
         "near": near,
         "total_groups": len(exact) + len(versions) + len(near),
     }
+
+
+def recycle_exact_duplicates(group: dict[str, Any], keeper_path: str | Path,
+                             database: Path | None = None,
+                             recycle=None) -> dict[str, Any]:
+    """Send user-approved, reverified exact copies to the OS Recycle Bin.
+
+    This function deliberately refuses version-name matches and near matches.
+    Each copy is re-hashed immediately before it is sent to the Recycle Bin.
+    The selected keeper and all files with different bytes remain untouched.
+    """
+    if str(group.get("kind", "")) != "Exact duplicates":
+        raise ValueError("Only byte-for-byte exact duplicate groups can use the Recycle Bin action.")
+    expected_hash = str(group.get("hash", "")).lower()
+    if not re.fullmatch(r"[a-f0-9]{64}", expected_hash):
+        raise ValueError("This duplicate group has no valid SHA-256 proof. No files were changed.")
+
+    keeper = Path(keeper_path).expanduser().resolve()
+    if not keeper.is_file() or sha256_file(keeper) != expected_hash:
+        raise ValueError("The chosen keeper is missing or has changed. Re-run duplicate analysis before continuing.")
+
+    if recycle is None:
+        try:
+            from send2trash import send2trash
+        except ImportError as error:
+            raise RuntimeError("Recycle Bin support is unavailable. Update Smart Drive Organizer and try again.") from error
+        recycle = send2trash
+
+    moved: list[str] = []
+    skipped: list[str] = []
+    errors: list[str] = []
+    target_db = database
+    if target_db is None:
+        from .search_index import index_database_path
+        target_db = index_database_path()
+    index = None
+    try:
+        if target_db.exists():
+            index = SearchIndex(target_db)
+        for row in group.get("files", []):
+            source = Path(str(row.get("path", ""))).expanduser().resolve()
+            if source == keeper:
+                continue
+            try:
+                if not source.is_file():
+                    skipped.append(f"Missing file: {source}")
+                    continue
+                # Recheck both sides immediately before any destructive operation.
+                current_keeper_hash = sha256_file(keeper)
+                current_source_hash = sha256_file(source)
+                if current_keeper_hash != expected_hash or current_source_hash != expected_hash:
+                    skipped.append(f"Content changed; left untouched: {source}")
+                    continue
+                recycle(str(source))
+                moved.append(str(source))
+                if index is not None:
+                    index.remove_path(source, commit=False)
+            except Exception as error:
+                errors.append(f"{source}: {error}")
+        if index is not None:
+            index.db.commit()
+    finally:
+        if index is not None:
+            index.close()
+    return {
+        "keeper": str(keeper),
+        "recycled": moved,
+        "skipped": skipped,
+        "errors": errors,
+        "recycled_count": len(moved),
+    }
