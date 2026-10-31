@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 
 $owner = 'T3ND41'
 $repository = 'SmartDriveOrganizer_RepoReady_v0.3.7'
@@ -85,7 +86,7 @@ try {
     $running = Get-Process -Name 'SmartDriveOrganizer' -ErrorAction SilentlyContinue
     if ($running) {
         Write-Host 'Smart Drive Organizer is already running. No second copy was opened.' -ForegroundColor Yellow
-        exit 0
+        return
     }
 
     Write-Host 'Checking for an existing application copy...' -ForegroundColor Cyan
@@ -104,6 +105,7 @@ try {
     $release = Invoke-RestMethod -Uri $apiUri -Headers @{
         Accept = 'application/vnd.github+json'
         'X-GitHub-Api-Version' = '2022-11-28'
+        'User-Agent' = 'SmartDriveOrganizer-PortableLauncher'
     }
 
     $tag = [string]$release.tag_name
@@ -117,11 +119,17 @@ try {
     if (-not $zipAsset -or -not $hashAsset) {
         throw "The latest release ($tag) does not contain the expected Windows ZIP and checksum files."
     }
+    $allowedAssetPrefix = "https://github.com/$owner/$repository/releases/download/"
+    foreach ($asset in @($zipAsset, $hashAsset)) {
+        if (-not ([string]$asset.browser_download_url).StartsWith($allowedAssetPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "GitHub returned an unexpected download host for $($asset.name). No download was started."
+        }
+    }
 
     if ($existing -and $existing.ParsedVersion -ge $latestVersion) {
         Write-Host "You already have the latest published version ($tag). No download or duplicate copy is needed." -ForegroundColor Green
         Start-ExistingCopy $existing
-        exit 0
+        return
     }
 
     if ($existing) {
@@ -131,7 +139,7 @@ try {
         if ($answer -notmatch '^(y|yes)$') {
             Write-Host 'Keeping the current version. No files were downloaded or changed.' -ForegroundColor Yellow
             Start-ExistingCopy $existing
-            exit 0
+        return
         }
         # Update in-place in the selected existing folder so the launcher does
         # not create another application directory or duplicate Start Menu entry.
@@ -150,8 +158,8 @@ try {
         $stagingFolder = Join-Path $workFolder 'extracted'
 
         Write-Host "Downloading $tag..." -ForegroundColor Cyan
-        Invoke-WebRequest -Uri $zipAsset.browser_download_url -OutFile $zipPath
-        Invoke-WebRequest -Uri $hashAsset.browser_download_url -OutFile $hashPath
+        Invoke-WebRequest -Uri $zipAsset.browser_download_url -OutFile $zipPath -Headers @{ 'User-Agent' = 'SmartDriveOrganizer-PortableLauncher' }
+        Invoke-WebRequest -Uri $hashAsset.browser_download_url -OutFile $hashPath -Headers @{ 'User-Agent' = 'SmartDriveOrganizer-PortableLauncher' }
 
         $expectedLine = Select-String -Path $hashPath -Pattern '^(?<hash>[A-Fa-f0-9]{64})\s+\*?SmartDriveOrganizer-windows-x64\.zip$' |
             Select-Object -First 1
