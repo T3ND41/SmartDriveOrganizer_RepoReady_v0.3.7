@@ -20,4 +20,4 @@ build = ["pyinstaller>=6.0.0"]
 include = ["smart_drive_organizer*"]
 
 [tool.setuptools.package-data]
-smart_drive_organizer = ["assets/*.png"]
+smart_drive_organizer = ["assets/*.png", "assets/icons/dark/*.png"]
