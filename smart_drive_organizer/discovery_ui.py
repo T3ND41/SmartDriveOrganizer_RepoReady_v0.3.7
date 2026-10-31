@@ -40,7 +40,7 @@ class DiscoveryReviewDialog(tk.Toplevel):
         ttk.Entry(pane,textvariable=self.name,width=30).pack(fill="x",pady=4)
         ttk.Button(pane,text="Update folder name",command=self._rename).pack(anchor="w",pady=(0,8))
         ttk.Label(pane,text="Example files / locations").pack(anchor="w")
-        self.examples=tk.Text(pane,width=31,height=12,wrap="word",font=("Segoe UI",8))
+        self.examples=tk.Text(pane,width=31,height=12,wrap="word",font=("Segoe UI",8),bg=palette["card"],fg=palette["ink"],insertbackground=palette["ink"],selectbackground=palette["red"],selectforeground=palette["white"])
         self.examples.pack(fill="both",expand=True)
         self.examples.configure(state="disabled")
         actions=ttk.Frame(outer); actions.pack(fill="x",pady=(10,0))
