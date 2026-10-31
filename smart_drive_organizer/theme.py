@@ -35,3 +35,32 @@ DARK = {
 def palette_for(parent: Any) -> dict[str, str]:
     """Return the application's persisted palette for any child dialog."""
     return DARK if getattr(parent, "theme_name", "light") == "dark" else LIGHT
+
+
+def apply_dialog_theme(widget: Any, parent: Any) -> dict[str, str]:
+    """Apply the selected palette to standard ttk widgets in secondary dialogs."""
+    palette = palette_for(parent)
+    style = ttk_style = None
+    try:
+        import tkinter.ttk as ttk
+        style = ttk.Style(widget)
+        style.theme_use("clam")
+        style.configure("TFrame", background=palette["bg"])
+        style.configure("TLabel", background=palette["bg"], foreground=palette["ink"], font=("Segoe UI", 9))
+        style.configure("TLabelframe", background=palette["bg"], bordercolor=palette["border"])
+        style.configure("TLabelframe.Label", background=palette["bg"], foreground=palette["ink"], font=("Segoe UI", 9, "bold"))
+        style.configure("TButton", background=palette["card"], foreground=palette["ink"], padding=(9, 7))
+        style.map("TButton", background=[("active", palette["hover"]), ("disabled", palette["disabled"])])
+        style.configure("TEntry", fieldbackground=palette["card"], foreground=palette["ink"])
+        style.configure("TCombobox", fieldbackground=palette["card"], foreground=palette["ink"])
+        style.configure("TCheckbutton", background=palette["bg"], foreground=palette["ink"])
+        style.configure("TRadiobutton", background=palette["bg"], foreground=palette["ink"])
+        style.configure("Treeview", background=palette["card"], fieldbackground=palette["card"], foreground=palette["ink"], rowheight=27)
+        style.configure("Treeview.Heading", background=palette["black"], foreground=palette["white"])
+    except Exception:
+        pass
+    try:
+        widget.configure(bg=palette["bg"])
+    except Exception:
+        pass
+    return palette
