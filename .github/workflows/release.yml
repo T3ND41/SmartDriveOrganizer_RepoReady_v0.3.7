@@ -55,6 +55,7 @@ jobs:
           --hidden-import win32com.client
           --hidden-import pythoncom
           --hidden-import pywintypes
+          --collect-submodules send2trash
           --add-data "config;config"
           --add-data "smart_drive_organizer/assets;smart_drive_organizer/assets"
           run.py
