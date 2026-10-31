@@ -33,3 +33,46 @@ jobs:
         run: python -m compileall -q smart_drive_organizer run.py
       - name: Run automated tests
         run: python -m unittest discover -s tests -v
+
+  branded-ui-smoke:
+    name: Branded desktop UI smoke test (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install application and build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[content,build]"
+      - name: Build packaged Windows application
+        run: >-
+          pyinstaller --noconfirm --clean --onefile --windowed
+          --name SmartDriveOrganizer
+          --icon smart_drive_organizer/assets/app_icon.ico
+          --collect-submodules smart_drive_organizer
+          --hidden-import pypdf
+          --hidden-import openpyxl
+          --hidden-import pptx
+          --collect-submodules extract_msg
+          --hidden-import win32com.client
+          --hidden-import pythoncom
+          --hidden-import pywintypes
+          --collect-submodules send2trash
+          --add-data "config;config"
+          --add-data "smart_drive_organizer/assets;smart_drive_organizer/assets"
+          run.py
+      - name: Launch app and capture Light, Dark and Redline screens
+        shell: pwsh
+        run: ./scripts/capture_brand_ui.ps1
+      - name: Upload branded UI screenshots and executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: smart-drive-organizer-branded-ui-review
+          path: |
+            brand-ui-screenshots/*.png
+            dist/SmartDriveOrganizer.exe
+          if-no-files-found: error
