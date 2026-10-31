@@ -50,8 +50,9 @@ NAV_FEATURE_ICONS = {
 
 def load_feature_icon_atlas(parent: tk.Misc, theme_name: str) -> tuple[tk.PhotoImage | None, dict[str, tk.PhotoImage]]:
     """Load the supplied brand icon atlas and crop its twelve 32px feature marks."""
-    theme_folder = "light" if theme_name == "light" else "dark"
-    atlas_path = Path(__file__).resolve().parent / "assets" / f"feature_icons_{theme_folder}.png"
+    # Use the verified supplied light atlas as the source in every theme;
+    # dark variants are recoloured below because the bundled dark atlas is blank.
+    atlas_path = Path(__file__).resolve().parent / "assets" / "feature_icons_light.png"
     try:
         source_atlas = tk.PhotoImage(master=parent, file=str(atlas_path))
     except (tk.TclError, OSError):
