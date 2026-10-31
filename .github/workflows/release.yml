@@ -47,6 +47,7 @@ jobs:
         run: >-
           pyinstaller --noconfirm --clean --onefile --windowed
           --name SmartDriveOrganizer
+          --icon smart_drive_organizer/assets/app_icon.ico
           --collect-submodules smart_drive_organizer
           --hidden-import pypdf
           --hidden-import openpyxl
