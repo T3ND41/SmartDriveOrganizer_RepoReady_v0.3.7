@@ -1,24 +1,13 @@
 ## 0.7.0 — Branded workspace, live progress and safer duplicate review
 
-- Replaced the application mark with the supplied official face-and-skull icon and added the supplied light/dark feature icon atlas for navigation.
-- Added a saved Redline theme alongside Light and Dark, using the official red, black and white brand palette.
-- Added a logo-centered circular progress indicator and clearer drive coverage, file match-rate, active search-term and matched-group telemetry.
-- Kept Pause, Resume and Cancel controls available across scan, indexing, duplicate analysis, Apply and Undo operations; all pause/cancel checks occur at safe work checkpoints.
-- Highlighted exact SHA-256 duplicate groups and expanded the side-by-side review to show the oldest and newest copies, timestamps, sizes, original locations and hash evidence.
-- Kept possible revisions and near-identical documents review-only. The Recycle Bin action remains limited to exact byte-for-byte matches, requires user confirmation, defaults to keeping the newest copy and rechecks hashes immediately before recycling older copies.
-- Confirmed the no-install PowerShell launcher checks existing installed and portable copies, launches the newest local copy when current, asks before upgrading an older copy, and avoids creating a second runtime folder.
-- Added documentation for theme, telemetry, pause/resume and duplicate safety behavior.
-
-## 0.7.0 — Brand refresh, operation controls and duplicate safety
-
-- Bundled the supplied split red/black master mark and six supplied navigation icons; added persistent Light and Dark themes to the main window, search, duplicate review, learning memory, automation, topic and GitHub settings dialogs.
-- Added the master mark beside the main progress counters, with completed drive percentage, examined/found file counts, match rate, classified topic counts and newly discovered filename phrases.
-- Added cooperative Pause, Resume and Cancel controls to recursive multi-drive scanning, local indexing, duplicate analysis, safe Copy/Move application and Move undo. Pauses occur at safe checkpoints; cancelled scans cannot be applied as complete plans.
-- Added explicit scan cancellation regression coverage and thread-safe pause/resume controller tests.
-- Highlighted duplicate findings by type and added side-by-side inspection cards for duplicate file versions/copies.
-- Added a user-confirmed Recycle Bin action for SHA-256 exact duplicates only. The selected newest modified file is kept; each proposed older copy and the keeper are re-hashed immediately before the Recycle Bin action. Near-matches and possible versions are never eligible.
-- Updated the no-install PowerShell launcher to detect an existing per-user copy or portable runtime, avoid starting a second running instance, compare local and latest GitHub release versions, ask before updating, and update the existing folder in place rather than creating a new application folder.
-- Added tests for exact-duplicate recycling, changed-after-review safety, non-exact group rejection, and pause/resume/cancel behaviour.
+- Applied the supplied split red/black face-and-skull mark and both supplied light/dark feature icon atlases to the application UI.
+- Added persistent Light, Dark and Redline themes using the official red `#D71920`, black `#101010` and white `#FFFFFF` palette.
+- Added a logo-centered circular progress indicator showing selected-drive coverage, files found versus examined, match rate, active search terms and matched groups.
+- Kept Pause, Resume and Cancel controls available across recursive scanning, local full-text indexing, duplicate analysis, Copy/Move application and Move undo. Pause and cancellation are cooperative and occur at safe checkpoints.
+- Highlighted duplicate findings and added side-by-side oldest/newest review cards with original locations, timestamps, sizes and SHA-256 evidence.
+- Restricted the Recycle Bin action to byte-for-byte exact duplicates. It requires explicit user confirmation, defaults to keeping the newest copy and re-hashes the keeper and each older copy immediately before recycling. Possible versions and near-matches are never eligible.
+- Confirmed the no-install PowerShell launcher checks installed and portable copies, avoids launching a second running instance, compares the local version with the latest published release, asks before upgrading and updates an existing folder in place.
+- Added tests for the theme palette and retained pause/resume/cancel and duplicate safety regression coverage.
 
 ## 0.6.0 — Local search, adaptive memory and duplicate intelligence
 
