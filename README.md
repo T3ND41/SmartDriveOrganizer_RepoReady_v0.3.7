@@ -134,7 +134,7 @@ Run tests with `python -m unittest discover -s tests -v`.
 
 ## CI and Windows releases
 
-Pushes to `main` run tests on Windows and Linux. Pushing a version tag such as `v0.6.0` runs the Windows release workflow, which tests the project, builds the executable, packages it, calculates SHA-256 and publishes a GitHub Release.
+Pushes to `main` run tests on Windows and Linux. Pushing a version tag such as `v0.7.0` runs the Windows release workflow, which tests the project, builds the executable, packages it, calculates SHA-256 and publishes a GitHub Release.
 
 ## Safety
 
