@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import queue
 import threading
 import tkinter as tk
@@ -59,13 +60,35 @@ def topic_rules_file() -> Path:
     return topic_rules_path()
 
 
+def ui_preferences_path() -> Path:
+    return app_data_dir() / "ui_preferences.json"
+
+
+def load_theme_preference() -> str:
+    try:
+        value = json.loads(ui_preferences_path().read_text(encoding="utf-8"))
+        theme = str(value.get("theme", "light")).casefold()
+        return theme if theme in {"light", "dark"} else "light"
+    except (OSError, json.JSONDecodeError, AttributeError, TypeError):
+        return "light"
+
+
+def save_theme_preference(theme: str) -> None:
+    if theme not in {"light", "dark"}:
+        raise ValueError("Theme must be Light or Dark.")
+    target = ui_preferences_path()
+    target.write_text(json.dumps({"theme": theme}, indent=2), encoding="utf-8")
+
+
 class OrganizerApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title(f"Smart Drive Organizer {__version__}")
         self.geometry("1180x850")
         self.minsize(980, 700)
-        self.configure(bg="#f3f5f8")
+        self.theme_name = load_theme_preference()
+        self.theme_var = tk.StringVar(value=self.theme_name.title())
+        self.configure(bg="#F4F4F5" if self.theme_name == "light" else "#151515")
 
         self.source_entries: list[tuple[Path, str]] = []
         self.output_var = tk.StringVar(value=str(Path.home() / "Documents" / "Smart Drive Organizer" / "Organized Files"))
@@ -95,37 +118,42 @@ class OrganizerApp(tk.Tk):
         self.after(120, self._poll_events)
 
     def _build_ui(self) -> None:
-        bg, white, black, red, muted, border = "#F4F4F5", "#FFFFFF", "#101010", "#D71920", "#737373", "#E4E4E7"
+        if self.theme_name == "dark":
+            bg, card, ink, black, white, red, muted, border = "#151515", "#242424", "#F4F4F5", "#090909", "#FFFFFF", "#D71920", "#A1A1AA", "#3F3F46"
+            hover, disabled, progress_trough, badge_bg = "#303030", "#484848", "#3F3F46", "#3A191B"
+        else:
+            bg, card, ink, black, white, red, muted, border = "#F4F4F5", "#FFFFFF", "#101010", "#101010", "#FFFFFF", "#D71920", "#737373", "#E4E4E7"
+            hover, disabled, progress_trough, badge_bg = "#F1F1F1", "#E5E5E5", "#E5E5E5", "#FEE2E2"
         style = ttk.Style(self)
         try: style.theme_use("clam")
         except tk.TclError: pass
         style.configure("TFrame", background=bg)
         style.configure("Page.TFrame", background=bg)
-        style.configure("Card.TFrame", background=white)
-        style.configure("TLabel", background=bg, foreground=black, font=("Segoe UI", 9))
-        style.configure("Card.TLabel", background=white, foreground=black, font=("Segoe UI", 9))
+        style.configure("Card.TFrame", background=card)
+        style.configure("TLabel", background=bg, foreground=ink, font=("Segoe UI", 9))
+        style.configure("Card.TLabel", background=card, foreground=ink, font=("Segoe UI", 9))
         style.configure("Muted.TLabel", background=white, foreground=muted, font=("Segoe UI", 9))
         style.configure("PageTitle.TLabel", background=bg, foreground=black, font=("Segoe UI", 22, "bold"))
         style.configure("PageSub.TLabel", background=bg, foreground=muted, font=("Segoe UI", 9))
         style.configure("Card.TLabelframe", background=white, borderwidth=1, relief="solid", bordercolor=border, lightcolor=border, darkcolor=border)
         style.configure("Card.TLabelframe.Label", background=white, foreground=black, font=("Segoe UI", 10, "bold"))
         style.configure("Card.TCheckbutton", background=white, foreground=black, font=("Segoe UI", 9))
-        style.map("Card.TCheckbutton", background=[("active", white)])
+        style.map("Card.TCheckbutton", background=[("active", card)])
         style.configure("Card.TRadiobutton", background=white, foreground=black, font=("Segoe UI", 9))
         style.map("Card.TRadiobutton", background=[("active", white)])
-        style.configure("TEntry", padding=7, fieldbackground=white, foreground=black)
+        style.configure("TEntry", padding=7, fieldbackground=card, foreground=black)
         style.configure("TButton", font=("Segoe UI", 9), padding=(10, 7), background=white, foreground=black)
-        style.map("TButton", background=[("active", "#F1F1F1"), ("disabled", "#E5E5E5")])
+        style.map("TButton", background=[("active", hover), ("disabled", disabled)])
         style.configure("Primary.TButton", font=("Segoe UI", 9, "bold"), padding=(16, 10), background=red, foreground=white)
-        style.map("Primary.TButton", background=[("active", "#B9151B"), ("disabled", "#E7A1A4")], foreground=[("disabled", white)])
+        style.map("Primary.TButton", background=[("active", "#B9151B"), ("disabled", "#8E5558" if self.theme_name == "dark" else "#E7A1A4")], foreground=[("disabled", white)])
         style.configure("Dark.TButton", font=("Segoe UI", 9, "bold"), padding=(13, 9), background=black, foreground=white)
         style.map("Dark.TButton", background=[("active", "#333333"), ("disabled", "#777777")])
-        style.configure("Secondary.TButton", font=("Segoe UI", 9), padding=(10, 7), background="#F4F4F5", foreground=black)
-        style.map("Secondary.TButton", background=[("active", "#E4E4E7")])
-        style.configure("Treeview", rowheight=29, font=("Segoe UI", 9), background=white, fieldbackground=white, foreground=black)
+        style.configure("Secondary.TButton", font=("Segoe UI", 9), padding=(10, 7), background=bg, foreground=ink)
+        style.map("Secondary.TButton", background=[("active", hover)])
+        style.configure("Treeview", rowheight=29, font=("Segoe UI", 9), background=card, fieldbackground=card, foreground=ink)
         style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"), background=black, foreground=white, padding=(8, 8), relief="flat")
         style.map("Treeview.Heading", background=[("active", red)])
-        style.configure("Red.Horizontal.TProgressbar", troughcolor="#E5E5E5", background=red, bordercolor="#E5E5E5", lightcolor=red, darkcolor=red)
+        style.configure("Red.Horizontal.TProgressbar", troughcolor=progress_trough, background=red, bordercolor=progress_trough, lightcolor=red, darkcolor=red)
         self.configure(bg=bg)
 
         shell = tk.Frame(self, bg=bg)
@@ -133,7 +161,7 @@ class OrganizerApp(tk.Tk):
         sidebar = tk.Frame(shell, bg=black, width=218)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
-        logo_path = Path(__file__).resolve().parent / "assets" / "brand_mark.png"
+        logo_path = Path(__file__).resolve().parent / "assets" / "brand_master.png"
         try:
             self.brand_photo = tk.PhotoImage(file=str(logo_path))
             self.iconphoto(True, self.brand_photo)
@@ -141,25 +169,70 @@ class OrganizerApp(tk.Tk):
         except (tk.TclError, OSError):
             tk.Frame(sidebar, bg=red, width=52, height=5).pack(anchor="w", padx=20, pady=(34, 28))
         tk.Label(sidebar, text="SMART DRIVE", bg=black, fg=white, font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=20)
-        tk.Label(sidebar, text="ORGANIZER", bg=black, fg="#F87171", font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=20, pady=(0, 22))
+        tk.Label(sidebar, text="ORGANIZER", bg=black, fg=red, font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=20, pady=(0, 22))
         tk.Frame(sidebar, bg=red, height=3).pack(fill="x", padx=20, pady=(0, 20))
         tk.Label(sidebar, text="WORKSPACE", bg=black, fg="#A3A3A3", font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=20, pady=(0, 8))
 
-        def nav_button(label: str, command: Callable[[], None], accent: bool = False) -> None:
-            tk.Button(sidebar, text=label, command=command, anchor="w", padx=20, pady=11, relief="flat",
-                borderwidth=0, cursor="hand2", bg=red if accent else black, fg=white,
-                activebackground="#B9151B" if accent else "#262626", activeforeground=white,
-                font=("Segoe UI", 9, "bold" if accent else "normal"), highlightthickness=0).pack(fill="x", padx=10, pady=2)
+        def nav_icon(parent: tk.Misc, kind: str, background: str, accent: bool = False) -> tk.Canvas:
+            canvas = tk.Canvas(parent, width=24, height=24, bg=background, highlightthickness=0, borderwidth=0)
+            stroke = "#FFFFFF"
+            mark = "#FFFFFF" if accent else red
+            def line(*coords, color=stroke, width=1.8):
+                canvas.create_line(*coords, fill=color, width=width, capstyle="round", joinstyle="round")
+            if kind == "grid":
+                for x, y in ((4,4),(13,4),(4,13),(13,13)):
+                    canvas.create_rectangle(x,y,x+6,y+6,outline=stroke,width=1.5)
+            elif kind == "drive":
+                for y in (5,12):
+                    canvas.create_rectangle(3,y,20,y+5,outline=stroke,width=1.4)
+                    canvas.create_oval(15,y+1,17,y+3,fill=mark,outline=mark)
+            elif kind == "document":
+                canvas.create_rectangle(5,2,17,22,outline=stroke,width=1.5)
+                line(8,9,14,9); line(8,13,14,13); line(8,17,12,17)
+            elif kind == "tag":
+                canvas.create_polygon(3,5,14,5,21,12,12,21,3,12,outline=stroke,fill="",width=1.5)
+                canvas.create_oval(6,8,8,10,outline=mark,width=1.5)
+            elif kind == "search":
+                canvas.create_oval(3,3,15,15,outline=stroke,width=1.8)
+                line(14,14,21,21,color=mark,width=2.4)
+            elif kind == "memory":
+                canvas.create_oval(4,3,19,18,outline=stroke,width=1.5)
+                line(8,11,11,8); line(11,8,15,11); line(15,11,11,15); line(11,15,8,11,color=mark)
+                line(11,18,11,22); line(8,22,14,22)
+            elif kind == "gear":
+                canvas.create_oval(5,5,19,19,outline=stroke,width=1.7)
+                canvas.create_oval(10,10,14,14,outline=mark,width=1.6)
+                for x1,y1,x2,y2 in ((12,1,12,5),(12,19,12,23),(1,12,5,12),(19,12,23,12),(4,4,7,7),(17,17,20,20),(4,20,7,17),(17,7,20,4)):
+                    line(x1,y1,x2,y2,width=1.7)
+            elif kind == "activity":
+                line(3,19,3,12); line(9,19,9,6,color=mark,width=2.2); line(15,19,15,9); line(21,19,21,3)
+                line(2,21,22,21)
+            elif kind == "branch":
+                canvas.create_oval(2,2,8,8,outline=stroke,width=1.5)
+                canvas.create_oval(16,2,22,8,outline=stroke,width=1.5)
+                canvas.create_oval(9,16,15,22,outline=mark,width=1.8)
+                line(5,8,5,12,14,12,19,8); line(12,12,12,16)
+            return canvas
 
-        nav_button("Overview", lambda: self._scroll_to_section("overview"))
-        nav_button("Locations", lambda: self._scroll_to_section("locations"))
-        nav_button("File formats", lambda: self._scroll_to_section("filetypes"))
-        nav_button("Topic groups & rules", lambda: self._scroll_to_section("selective"))
-        nav_button("Search all files", self._open_search_dashboard, accent=True)
-        nav_button("Learning memory", self._open_learning_memory)
-        nav_button("Automation settings", self._open_automation_settings)
-        nav_button("Activity log", self._open_activity_log)
-        nav_button("GitHub publishing", self._open_github_publisher)
+        def nav_button(label: str, command: Callable[[], None], icon: str, accent: bool = False) -> None:
+            button_bg = red if accent else black
+            holder = tk.Frame(sidebar, bg=button_bg)
+            holder.pack(fill="x", padx=10, pady=2)
+            nav_icon(holder, icon, button_bg, accent).pack(side="left", padx=(14, 7), pady=7)
+            tk.Button(holder, text=label, command=command, anchor="w", padx=3, pady=11, relief="flat",
+                borderwidth=0, cursor="hand2", bg=button_bg, fg=white,
+                activebackground="#B9151B" if accent else "#262626", activeforeground=white,
+                font=("Segoe UI", 9, "bold" if accent else "normal"), highlightthickness=0).pack(side="left", fill="x", expand=True)
+
+        nav_button("Overview", lambda: self._scroll_to_section("overview"), "grid")
+        nav_button("Locations", lambda: self._scroll_to_section("locations"), "drive")
+        nav_button("File formats", lambda: self._scroll_to_section("filetypes"), "document")
+        nav_button("Topic groups & rules", lambda: self._scroll_to_section("selective"), "tag")
+        nav_button("Search all files", self._open_search_dashboard, "search", accent=True)
+        nav_button("Learning memory", self._open_learning_memory, "memory")
+        nav_button("Automation settings", self._open_automation_settings, "gear")
+        nav_button("Activity log", self._open_activity_log, "activity")
+        nav_button("GitHub publishing", self._open_github_publisher, "branch")
         tk.Frame(sidebar, bg="#404040", height=1).pack(fill="x", padx=18, pady=(22, 14))
         tk.Label(sidebar, text="PRIVATE BY DESIGN", bg=black, fg=white, font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=20)
         tk.Label(sidebar, text="Your files stay on this computer. Nothing changes until you review and confirm.",
@@ -168,14 +241,18 @@ class OrganizerApp(tk.Tk):
 
         main = tk.Frame(shell, bg=bg)
         main.pack(side="left", fill="both", expand=True)
-        topbar = tk.Frame(main, bg=white, height=72)
+        topbar = tk.Frame(main, bg=card, height=72)
         topbar.pack(fill="x")
         topbar.pack_propagate(False)
-        top_left = tk.Frame(topbar, bg=white)
+        top_left = tk.Frame(topbar, bg=card)
         top_left.pack(side="left", fill="y", padx=24)
-        tk.Label(top_left, text="Smart Drive Organizer", bg=white, fg=black, font=("Segoe UI", 14, "bold")).pack(anchor="w", pady=(15, 0))
-        tk.Label(top_left, text="A safer, clearer way to organize your files", bg=white, fg=muted, font=("Segoe UI", 8)).pack(anchor="w", pady=(1, 0))
-        tk.Label(topbar, text="●  LOCAL-FIRST", bg="#FEE2E2", fg=red, font=("Segoe UI", 8, "bold"), padx=10, pady=7).pack(side="right", padx=24, pady=17)
+        tk.Label(top_left, text="Smart Drive Organizer", bg=card, fg=ink, font=("Segoe UI", 14, "bold")).pack(anchor="w", pady=(15, 0))
+        tk.Label(top_left, text="A safer, clearer way to organize your files", bg=card, fg=muted, font=("Segoe UI", 8)).pack(anchor="w", pady=(1, 0))
+        tk.Label(topbar, text="●  LOCAL-FIRST", bg=badge_bg, fg=red, font=("Segoe UI", 8, "bold"), padx=10, pady=7).pack(side="right", padx=(8, 20), pady=17)
+        ttk.Label(topbar, text="Theme", background=card, foreground=muted).pack(side="right", padx=(12, 4))
+        theme_picker = ttk.Combobox(topbar, textvariable=self.theme_var, values=("Light", "Dark"), state="readonly", width=8)
+        theme_picker.pack(side="right", pady=17)
+        theme_picker.bind("<<ComboboxSelected>>", self._change_theme)
         tk.Frame(main, bg=red, height=3).pack(fill="x")
 
         scroll_area = tk.Frame(main, bg=bg)
@@ -207,7 +284,7 @@ class OrganizerApp(tk.Tk):
         source_frame = ttk.Frame(locations, style="Card.TFrame")
         source_frame.grid(row=0, column=1, sticky="nsew", pady=4)
         self.source_listbox = tk.Listbox(source_frame, selectmode=tk.EXTENDED, exportselection=False, height=4,
-            font=("Segoe UI", 9), activestyle="dotbox", relief="flat", borderwidth=0, bg="#FAFAFA", fg=black,
+            font=("Segoe UI", 9), activestyle="dotbox", relief="flat", borderwidth=0, bg=card, fg=ink,
             selectbackground=red, selectforeground=white, highlightthickness=1, highlightbackground=border)
         self.source_listbox.pack(side="left", fill="both", expand=True)
         source_scroll = ttk.Scrollbar(source_frame, orient="vertical", command=self.source_listbox.yview)
@@ -318,6 +395,35 @@ class OrganizerApp(tk.Tk):
         ttk.Label(footer, textvariable=self.automation_status_var, style="PageSub.TLabel", wraplength=950).pack(anchor="w", pady=(4, 0))
         self._refresh_drives(select_defaults=True)
         self.after(1000, self._refresh_automation_status)
+
+    def _change_theme(self, _event=None) -> None:
+        selected = self.theme_var.get().strip().casefold()
+        if selected not in {"light", "dark"} or selected == self.theme_name:
+            return
+        if self.busy:
+            self.theme_var.set(self.theme_name.title())
+            messagebox.showinfo("Theme unavailable while working", "Pause or finish the current operation before changing the application theme.", parent=self)
+            return
+        selected_sources = [str(path.resolve()) for path, _label in self._selected_source_entries()]
+        try:
+            save_theme_preference(selected)
+        except OSError as error:
+            self.theme_var.set(self.theme_name.title())
+            messagebox.showerror("Could not save theme", str(error), parent=self)
+            return
+        self.theme_name = selected
+        for child in self.winfo_children():
+            child.destroy()
+        self._build_ui()
+        selected_keys = {os.path.normcase(value) for value in selected_sources}
+        self.source_listbox.selection_clear(0, "end")
+        for index, (path, _label) in enumerate(self.source_entries):
+            if os.path.normcase(str(path.resolve())) in selected_keys:
+                self.source_listbox.selection_set(index)
+        self.theme_var.set(self.theme_name.title())
+        if self.plan is not None:
+            self._show_plan(self.plan)
+        self.status_var.set(f"{self.theme_name.title()} theme applied. Your saved preferences and scan locations were kept.")
 
     def _scroll_to_section(self, section: str) -> None:
         target = self._scroll_targets.get(section)
