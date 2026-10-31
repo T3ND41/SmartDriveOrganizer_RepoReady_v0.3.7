@@ -13,7 +13,7 @@ from tkinter import messagebox, ttk
 from .duplicates import analyze_duplicates, recycle_exact_duplicates
 from .search_index import SearchIndex, build_index
 from .operation_control import OperationCancelled, OperationControl
-from .theme import apply_dialog_theme, palette_for
+from .theme import apply_dialog_theme
 
 
 def _open_path(path: Path) -> None:
@@ -51,6 +51,7 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.groups = result.get("exact", []) + result.get("versions", []) + result.get("near", [])
         self.active_files: list[dict] = []
         palette = apply_dialog_theme(self, parent)
+        self.theme_name = getattr(parent, "theme_name", "light")
         bg, card, ink, black, white, red, muted = (
             palette["bg"], palette["card"], palette["ink"], palette["black"],
             palette["white"], palette["red"], palette["muted"],
@@ -106,9 +107,9 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.compare_frame.columnconfigure(1, weight=1)
         ttk.Label(details, text="Exact matches are verified by SHA-256. No files are changed during review.", foreground=red, wraplength=420).pack(anchor="w", pady=(7, 0))
         self.active_group = None
-        self.tree.tag_configure("exact", background="#FEE2E2" if self.theme_name == "light" else "#4A171B", foreground="#7F1D1D" if self.theme_name == "light" else "#FFFFFF")
-        self.tree.tag_configure("version", background="#E4E4E7" if self.theme_name == "light" else "#303030", foreground="#101010" if self.theme_name == "light" else "#FFFFFF")
-        self.tree.tag_configure("near", background="#F4F4F5" if self.theme_name == "light" else "#242424", foreground="#737373" if self.theme_name == "light" else "#C4C4C4")
+        self.tree.tag_configure("exact", background=palette["badge"], foreground=red)
+        self.tree.tag_configure("version", background=palette["border"], foreground=ink)
+        self.tree.tag_configure("near", background=palette["bg"], foreground=muted)
         for i, group in enumerate(self.groups):
             sim = "—" if group.get("similarity") is None else f"{group['similarity']:.0%}"
             kind = str(group.get("kind", ""))
@@ -145,8 +146,7 @@ class DuplicateReviewDialog(tk.Toplevel):
             label = str(row["path"])
             self.file_list.insert("end", label)
             if exact_match:
-                self.file_list.itemconfig(index, background="#FEE2E2" if self.theme_name == "light" else "#4A171B",
-                                          foreground="#7F1D1D" if self.theme_name == "light" else "#FFFFFF")
+                self.file_list.itemconfig(index, background=palette["badge"], foreground=palette["red"])
         if len(self.active_files) >= 2:
             ordered = sorted(self.active_files, key=lambda row: (float(row.get("modified_ts", 0) or 0), str(row.get("path", "")).casefold()))
             pair = (ordered[0], ordered[-1]) if exact_match else (self.active_files[0], self.active_files[1])
@@ -252,7 +252,7 @@ class SearchDashboardDialog(tk.Toplevel):
         self.events: queue.Queue = queue.Queue()
         self.busy = False
         self.operation_control: OperationControl | None = None
-        palette = palette_for(parent)
+        palette = apply_dialog_theme(self, parent)
         bg, white, black, red, muted = (
             palette["bg"], palette["card"], palette["black"],
             palette["red"], palette["muted"],
@@ -270,7 +270,7 @@ class SearchDashboardDialog(tk.Toplevel):
         style.configure("TEntry", padding=8, fieldbackground=white, foreground=ink)
         style.configure("TButton", font=("Segoe UI", 9), padding=(10, 7))
         style.configure("Primary.TButton", background=red, foreground=white, font=("Segoe UI", 9, "bold"), padding=(14, 9))
-        style.map("Primary.TButton", background=[("active", "#B9151B")])
+        style.map("Primary.TButton", background=[("active", red)])
         style.configure("Treeview", rowheight=28, font=("Segoe UI", 9), background=white, fieldbackground=white, foreground=ink)
         style.configure("Treeview.Heading", background=black, foreground=white, font=("Segoe UI", 9, "bold"), padding=7)
 
