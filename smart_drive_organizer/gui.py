@@ -30,6 +30,7 @@ from .search_dashboard import SearchDashboardDialog
 from .memory_ui import LearningMemoryDialog
 from .search_index import sync_journal_actions
 from .operation_control import OperationCancelled, OperationControl
+from .theme import apply_dialog_theme
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
@@ -176,7 +177,7 @@ class OrganizerApp(tk.Tk):
         style.configure("TButton", font=("Segoe UI", 9), padding=(10, 7), background=card, foreground=ink)
         style.map("TButton", background=[("active", hover), ("disabled", disabled)])
         style.configure("Primary.TButton", font=("Segoe UI", 9, "bold"), padding=(16, 10), background=red, foreground=white)
-        style.map("Primary.TButton", background=[("active", "#B9151B"), ("disabled", "#8E5558" if self.theme_name in {"dark", "redline"} else "#E7A1A4")], foreground=[("disabled", white)])
+        style.map("Primary.TButton", background=[("active", "#D71920"), ("disabled", "#8E5558" if self.theme_name in {"dark", "redline"} else "#E7A1A4")], foreground=[("disabled", white)])
         style.configure("Dark.TButton", font=("Segoe UI", 9, "bold"), padding=(13, 9), background=black, foreground=white)
         style.map("Dark.TButton", background=[("active", "#333333"), ("disabled", "#777777")])
         style.configure("Secondary.TButton", font=("Segoe UI", 9), padding=(10, 7), background=bg, foreground=ink)
@@ -193,13 +194,22 @@ class OrganizerApp(tk.Tk):
         sidebar = tk.Frame(shell, bg=black, width=218)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
-        logo_path = Path(__file__).resolve().parent / "assets" / "brand_master.png"
+        assets_dir = Path(__file__).resolve().parent / "assets"
+        logo_path = assets_dir / "brand_master.png"
         try:
             self.brand_photo = tk.PhotoImage(file=str(logo_path))
             self.iconphoto(True, self.brand_photo)
             tk.Label(sidebar, image=self.brand_photo, bg=black, borderwidth=0).pack(anchor="w", padx=20, pady=(22, 10))
         except (tk.TclError, OSError):
-            tk.Frame(sidebar, bg=red, width=52, height=5).pack(anchor="w", padx=20, pady=(34, 28))
+            # Never substitute a hand-drawn mark for the approved supplied logo.
+            self.brand_photo = None
+        if os.name == "nt":
+            app_icon = assets_dir / "app_icon.ico"
+            if app_icon.is_file():
+                try:
+                    self.iconbitmap(default=str(app_icon))
+                except tk.TclError:
+                    pass
         tk.Label(sidebar, text="SMART DRIVE", bg=black, fg=white, font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=20)
         tk.Label(sidebar, text="ORGANIZER", bg=black, fg=red, font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=20, pady=(0, 22))
         tk.Frame(sidebar, bg=red, height=3).pack(fill="x", padx=20, pady=(0, 20))
@@ -223,7 +233,7 @@ class OrganizerApp(tk.Tk):
             nav_icon(holder, icon, button_bg, accent).pack(side="left", padx=(14, 7), pady=7)
             tk.Button(holder, text=label, command=command, anchor="w", padx=3, pady=11, relief="flat",
                 borderwidth=0, cursor="hand2", bg=button_bg, fg=white,
-                activebackground="#B9151B" if accent else "#262626", activeforeground=white,
+                activebackground=red if accent else "#101010", activeforeground=white,
                 font=("Segoe UI", 9, "bold" if accent else "normal"), highlightthickness=0).pack(side="left", fill="x", expand=True)
 
         nav_button("Overview", lambda: self._scroll_to_section("overview"), "grid")
@@ -1149,6 +1159,7 @@ class OrganizerApp(tk.Tk):
         dialog.transient(self)
         dialog.grab_set()
         dialog.resizable(False, False)
+        apply_dialog_theme(dialog, self)
         frame = ttk.Frame(dialog, padding=16)
         frame.pack(fill="both", expand=True)
         name_var = tk.StringVar()
