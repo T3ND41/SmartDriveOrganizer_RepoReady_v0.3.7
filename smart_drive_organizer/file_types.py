@@ -138,6 +138,7 @@ class FileTypeSelectionDialog(tk.Toplevel):
         self.transient(parent)
         self.grab_set()
         palette = apply_dialog_theme(self, parent)
+        self.brand_palette = palette
         style = ttk.Style(self)
         style.configure("Title.TLabel", background=palette["bg"], foreground=palette["ink"], font=("Segoe UI", 15, "bold"))
         self.result: dict[str, list[str]] | None = None
@@ -179,7 +180,7 @@ class FileTypeSelectionDialog(tk.Toplevel):
         ttk.Button(buttons, text="Clear selection", command=lambda name=category: self._clear(name)).pack(side="left")
         shell = ttk.Frame(tab)
         shell.pack(fill="both", expand=True)
-        canvas = tk.Canvas(shell, highlightthickness=0, bg=palette["card"])
+        canvas = tk.Canvas(shell, highlightthickness=0, bg=self.brand_palette["card"])
         scrollbar = ttk.Scrollbar(shell, orient="vertical", command=canvas.yview)
         content = ttk.Frame(canvas)
         content.bind("<Configure>", lambda _event, c=canvas: c.configure(scrollregion=c.bbox("all")))
