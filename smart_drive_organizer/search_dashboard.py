@@ -58,13 +58,6 @@ class DuplicateReviewDialog(tk.Toplevel):
             palette["white"], palette["red"], palette["muted"],
         )
         self.configure(bg=bg)
-        self.feature_icons = getattr(parent, "feature_icons", {})
-        def feature_button(container: tk.Misc, feature: str, **options) -> ttk.Button:
-            icon = self.feature_icons.get(feature)
-            if icon is not None:
-                options["image"] = icon
-                options["compound"] = "left"
-            return ttk.Button(container, **options)
         style = ttk.Style(self)
         try: style.theme_use("clam")
         except tk.TclError: pass
@@ -268,6 +261,13 @@ class SearchDashboardDialog(tk.Toplevel):
         ink = palette["ink"]
         self.theme_name = getattr(parent, "theme_name", "light")
         self.configure(bg=bg)
+        self.feature_icons = getattr(parent, "feature_icons", {})
+        def feature_button(container: tk.Misc, feature: str, **options) -> ttk.Button:
+            icon = self.feature_icons.get(feature)
+            if icon is not None:
+                options["image"] = icon
+                options["compound"] = "left"
+            return ttk.Button(container, **options)
         style = ttk.Style(self)
         try: style.theme_use("clam")
         except tk.TclError: pass
