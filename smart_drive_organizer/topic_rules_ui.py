@@ -10,6 +10,7 @@ from .classifier import normalize_topic_rules, safe_folder_name
 from .automation import topic_rules_path
 from .github_publish import should_offer_github_publish
 from .github_publish_ui import GitHubPublishDialog
+from .theme import apply_dialog_theme
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 
@@ -24,6 +25,7 @@ class TopicRulesDialog(tk.Toplevel):
         self.minsize(900, 680)
         self.transient(parent)
         self.grab_set()
+        palette = apply_dialog_theme(self, parent)
         self.on_saved = on_saved
         self.rules = normalize_topic_rules(rules)
         self.original_rules = normalize_topic_rules(rules)
@@ -80,7 +82,7 @@ class TopicRulesDialog(tk.Toplevel):
         ttk.Button(destination_row, text="Browse…", command=self._browse_destination).pack(side="left", padx=(6, 0))
         ttk.Label(right, text="Leave blank to use the main Organized Output / Category / Topic / Extension structure. A custom destination receives matching files directly.", wraplength=340).pack(anchor="w", pady=(0, 9))
         ttk.Label(right, text="Keywords and phrases (commas or new lines)").pack(anchor="w")
-        self.keywords_text = tk.Text(right, height=6, wrap="word", font=("Segoe UI", 9))
+        self.keywords_text = tk.Text(right, height=6, wrap="word", font=("Segoe UI", 9), bg=palette["card"], fg=palette["ink"], insertbackground=palette["ink"], selectbackground=palette["red"], selectforeground=palette["white"])
         self.keywords_text.pack(fill="both", expand=True, pady=(3, 5))
         ttk.Label(right, text="Example: QUO, quotation, quote number. With Contains, QUO matches Quotation - S01610.", wraplength=340).pack(anchor="w", pady=(0, 8))
         ttk.Button(right, text="Add / update topic", command=self._upsert).pack(fill="x", pady=3)
