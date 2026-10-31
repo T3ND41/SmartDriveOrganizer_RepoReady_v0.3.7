@@ -173,7 +173,27 @@ class OrganizerApp(tk.Tk):
         tk.Frame(sidebar, bg=red, height=3).pack(fill="x", padx=20, pady=(0, 20))
         tk.Label(sidebar, text="WORKSPACE", bg=black, fg="#A3A3A3", font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=20, pady=(0, 8))
 
-        def nav_icon(parent: tk.Misc, kind: str, background: str, accent: bool = False) -> tk.Canvas:
+        self.nav_icon_photos = []
+        icon_assets = {
+            "search": "deep-search",
+            "drive": "multi-drive",
+            "document": "extension-filter",
+            "tag": "smart-grouping",
+            "memory": "persistent-rules",
+            "gear": "background-monitor",
+        }
+
+        def nav_icon(parent: tk.Misc, kind: str, background: str, accent: bool = False) -> tk.Widget:
+            asset_name = icon_assets.get(kind)
+            if asset_name:
+                asset_path = Path(__file__).resolve().parent / "assets" / "icons" / "dark" / f"{asset_name}.png"
+                if asset_path.is_file():
+                    try:
+                        photo = tk.PhotoImage(file=str(asset_path))
+                        self.nav_icon_photos.append(photo)
+                        return tk.Label(parent, image=photo, bg=background, borderwidth=0)
+                    except (tk.TclError, OSError):
+                        pass
             canvas = tk.Canvas(parent, width=24, height=24, bg=background, highlightthickness=0, borderwidth=0)
             stroke = "#FFFFFF"
             mark = "#FFFFFF" if accent else red
