@@ -15,6 +15,8 @@ public static class WindowCapture {
   [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr extra);
   [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
   [DllImport("kernel32.dll", SetLastError=true)] private static extern IntPtr OpenProcess(uint access, bool inherit, uint processId);
   [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] private static extern bool QueryFullProcessImageName(IntPtr process, uint flags, StringBuilder path, ref int size);
@@ -63,6 +65,11 @@ foreach ($theme in @('light', 'dark', 'redline')) {
       $running | Format-Table -AutoSize | Out-String | Write-Host
       throw "Could not find the application's top-level window for theme $theme."
     }
+    # Restore and maximize the window before capture. Hosted Windows runners can
+    # create the app at a smaller default size even when startup succeeds.
+    [void][WindowCapture]::ShowWindow($handle, 9) # SW_RESTORE
+    [void][WindowCapture]::ShowWindow($handle, 3) # SW_MAXIMIZE
+    [void][WindowCapture]::SetForegroundWindow($handle)
     Start-Sleep -Seconds 2
     $rect = New-Object WindowCapture+RECT
     if (-not [WindowCapture]::GetWindowRect($handle, [ref]$rect)) { throw "Could not measure the app window for theme $theme." }
