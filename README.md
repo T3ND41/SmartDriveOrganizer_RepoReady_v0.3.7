@@ -4,38 +4,28 @@
 
 A local-first Windows file organizer with a redesigned desktop workspace, custom keyword routing, multi-drive scanning, persistent rules and optional background monitoring.
 
-**Brand system:** black `#101010`, red `#D71920`, and white `#FFFFFF`. The supplied split red/black face-and-skull master mark and dark navigation icons are bundled with the application. Light and Dark themes are selectable and saved locally.
+**Brand system:** red `#D71920`, black `#101010`, and white `#FFFFFF`. The supplied split red/black face-and-skull mark and supplied light/dark feature icons are bundled with the application. The saved themes are Light, Dark and Redline.
 
 ## v0.7.0 — Branded workspace, progress control and safer duplicate review
 
-- Applied the supplied master logo, brand palette and supplied dark navigation icon artwork. Added persistent Light and Dark themes across the main workspace and secondary settings/search dialogs.
-- Added the master logo beside scan progress counters: completed drives and percentage, files found versus files examined, match rate, classified topic counts and newly discovered filename phrases.
-- Added Pause, Resume and Cancel controls to recursive scans, full-text indexing, duplicate comparison, file application and undo. Operations pause at safe checkpoints; completed file actions remain in the existing audit journal.
-- Added colour-coded duplicate findings and side-by-side review cards for the older/newer copies.
-- Added a confirmation-only action for exact duplicates. It re-hashes the chosen keeper and each older copy immediately before sending older exact copies to the OS Recycle Bin. Possible versions and near-matches cannot use this action. No automatic or permanent delete is performed.
-- Updated the one-line PowerShell launcher to detect a per-user app copy and portable runtime, avoid opening a second running instance, compare the installed version with the latest stable GitHub Release, and ask before updating an older version in place.
-- Bundled supplied navigation icon assets and master artwork in the Windows executable.
+- Applied the supplied master logo and light/dark feature icon atlas; added persistent Light, Dark and Redline themes across the main workspace and secondary dialogs.
+- Added a logo-centered circular progress indicator. During scans it reports completed-drive percentage, files found versus examined, match rate, active search terms and matching topic groups.
+- Pause, Resume and Cancel are available during recursive scans, full-text indexing, duplicate analysis, Apply and Undo. Pausing retains in-memory progress at safe checkpoints; cancellation records completed file actions in the audit journal. Closing the app is not a persisted pause.
+- Duplicate findings are colour-coded. Exact SHA-256 matches show the oldest and newest files side by side, including their original locations, sizes, timestamps and hash evidence.
+- Only byte-for-byte exact copies can be sent to the Recycle Bin, after explicit confirmation and fresh SHA-256 checks. The newest copy is the default keeper. Possible versions and near-matches remain review-only; nothing is automatically or permanently deleted.
+- The no-install PowerShell launcher checks installed and portable copies before downloading. It opens an already-current copy without creating another, asks before upgrading an older copy, and updates that existing folder in place.
 
 ### Pause and resume behaviour
 
-Pause and Resume are available while the application is scanning, indexing, analysing duplicates, applying a file plan or undoing a Move. Cancel stops at the next safe checkpoint. A cancelled scan displays partial information but cannot be applied as a completed organization plan. A cancelled Move/apply job records completed actions in its journal and never silently rolls them back.
+Pause and Resume are available while the application is scanning, indexing, analysing duplicates, applying a file plan or undoing a Move. Cancel stops at the next safe checkpoint. A cancelled scan displays partial information but cannot be applied as a completed organization plan. Completed file actions remain recorded in the journal and are not silently rolled back.
 
 ### Duplicate handling
 
-Exact duplicates are byte-for-byte matches verified using SHA-256. The default action keeps the newest modified copy and offers older exact copies for confirmation before sending them to the Recycle Bin. The app checks the SHA-256 values again immediately before each action. Filename versions and near-identical documents remain review-only and are never eligible for this action.
+Exact duplicates are byte-for-byte matches verified using SHA-256. The default action keeps the newest modified copy and offers older exact copies for confirmation before sending them to the Recycle Bin. The app checks the SHA-256 values again immediately before each action. Filename versions and near-identical documents remain review-only.
 
 ### Version-aware portable launcher
 
 Use the one-line command under **Run without installing**. It checks for an existing per-user copy in `%LOCALAPPDATA%\\Programs\\SmartDriveOrganizer` and portable copies under `%LOCALAPPDATA%\\SmartDriveOrganizer\\PortableRuntime`. If a current version is already present, it launches that copy. If an older copy is found, it offers an update and updates that same folder rather than creating another application folder. The launcher will not replace an executable while Smart Drive Organizer is running.
-
-## Brand, live progress and workflow controls (v0.7.0)
-
-- Applied the official supplied face-and-skull mark and the supplied light/dark feature icon artwork. The visual system uses red `#D71920`, black `#101010` and white `#FFFFFF`.
-- Added three switchable desktop themes: Light, Dark and Redline. The selected theme is saved locally.
-- Added a branded circular coverage indicator. During scans it reports the percentage of selected drives completed, the number of files found versus examined, the match rate, the active search terms and the groups/files matched.
-- Pause, Resume and Cancel are available during drive scans, search-index refresh, duplicate analysis, Apply and Undo. Pause retains the current in-memory progress; Cancel stops at a safe checkpoint and records completed actions. Closing the application is not a persisted pause.
-- Duplicate review highlights exact SHA-256 matches and shows the oldest and newest copies side by side with their original paths, sizes and modification times. Only byte-for-byte exact copies can be sent to the Recycle Bin, and only after explicit confirmation and a fresh hash check. The newest exact copy is the default keeper. Possible versions and near-matches are review-only and cannot be deleted through this action.
-- The no-install PowerShell launcher checks installed and portable copies before downloading. It opens an already-current copy without making another one; when a newer published release exists, it asks before updating the existing copy. On first use it keeps one portable runtime cache and does not create Start Menu shortcuts or installer registry entries.
 
 ## Optional conventional installer
 
@@ -52,7 +42,7 @@ The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, 
 ## Interface refresh (v0.4.0)
 
 - Added a black navigation rail, white workspace cards, red primary actions and a consistent typography and spacing system.
-- Added the supplied monochrome artwork as the application mark and window icon.
+- Added the supplied split red/black face-and-skull artwork as the application mark and window icon.
 - Grouped locations, file formats, organization preferences, topic rules and preview into a scrollable workflow. Existing file operations and safety confirmations remain connected.
 
 ## Safe deep search and automatic discovery (v0.5.0)
