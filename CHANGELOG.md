@@ -1,3 +1,14 @@
+## 0.7.0 — Branded workspace, live progress and safer duplicate review
+
+- Replaced the application mark with the supplied official face-and-skull icon and added the supplied light/dark feature icon atlas for navigation.
+- Added a saved Redline theme alongside Light and Dark, using the official red, black and white brand palette.
+- Added a logo-centered circular progress indicator and clearer drive coverage, file match-rate, active search-term and matched-group telemetry.
+- Kept Pause, Resume and Cancel controls available across scan, indexing, duplicate analysis, Apply and Undo operations; all pause/cancel checks occur at safe work checkpoints.
+- Highlighted exact SHA-256 duplicate groups and expanded the side-by-side review to show the oldest and newest copies, timestamps, sizes, original locations and hash evidence.
+- Kept possible revisions and near-identical documents review-only. The Recycle Bin action remains limited to exact byte-for-byte matches, requires user confirmation, defaults to keeping the newest copy and rechecks hashes immediately before recycling older copies.
+- Confirmed the no-install PowerShell launcher checks existing installed and portable copies, launches the newest local copy when current, asks before upgrading an older copy, and avoids creating a second runtime folder.
+- Added documentation for theme, telemetry, pause/resume and duplicate safety behavior.
+
 ## 0.7.0 — Brand refresh, operation controls and duplicate safety
 
 - Bundled the supplied split red/black master mark and six supplied navigation icons; added persistent Light and Dark themes to the main window, search, duplicate review, learning memory, automation, topic and GitHub settings dialogs.
