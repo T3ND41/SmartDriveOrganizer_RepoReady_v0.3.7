@@ -51,6 +51,7 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.groups = result.get("exact", []) + result.get("versions", []) + result.get("near", [])
         self.active_files: list[dict] = []
         palette = apply_dialog_theme(self, parent)
+        self.brand_palette = palette
         self.theme_name = getattr(parent, "theme_name", "light")
         bg, card, ink, black, white, red, muted = (
             palette["bg"], palette["card"], palette["ink"], palette["black"],
@@ -146,7 +147,7 @@ class DuplicateReviewDialog(tk.Toplevel):
             label = str(row["path"])
             self.file_list.insert("end", label)
             if exact_match:
-                self.file_list.itemconfig(index, background=palette["badge"], foreground=palette["red"])
+                self.file_list.itemconfig(index, background=self.brand_palette["badge"], foreground=self.brand_palette["red"])
         if len(self.active_files) >= 2:
             ordered = sorted(self.active_files, key=lambda row: (float(row.get("modified_ts", 0) or 0), str(row.get("path", "")).casefold()))
             pair = (ordered[0], ordered[-1]) if exact_match else (self.active_files[0], self.active_files[1])
