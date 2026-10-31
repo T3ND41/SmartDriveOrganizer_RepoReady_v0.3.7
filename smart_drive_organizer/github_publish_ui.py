@@ -20,6 +20,7 @@ from .github_publish import (
     publish_topic_rules_to_github,
     save_github_settings,
 )
+from .theme import apply_dialog_theme
 
 
 class GitHubPublishDialog(tk.Toplevel):
@@ -38,6 +39,7 @@ class GitHubPublishDialog(tk.Toplevel):
         self.minsize(740, 590)
         self.transient(parent)
         self.grab_set()
+        apply_dialog_theme(self, parent)
 
         legacy_url = ""
         legacy_path = self.settings.get("repository_path", "")
