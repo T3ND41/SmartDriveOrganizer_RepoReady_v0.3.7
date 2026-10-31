@@ -12,6 +12,7 @@ from tkinter import messagebox, ttk
 
 from .duplicates import analyze_duplicates
 from .search_index import SearchIndex, build_index
+from .operation_control import OperationCancelled, OperationControl
 
 
 def _open_path(path: Path) -> None:
@@ -132,6 +133,7 @@ class SearchDashboardDialog(tk.Toplevel):
         self.rows: list[dict] = []
         self.events: queue.Queue = queue.Queue()
         self.busy = False
+        self.operation_control: OperationControl | None = None
         bg, white, black, red, muted = "#F4F4F5", "#FFFFFF", "#101010", "#D71920", "#666666"
         self.configure(bg=bg)
         style = ttk.Style(self)
@@ -186,6 +188,10 @@ class SearchDashboardDialog(tk.Toplevel):
         self.status_var = tk.StringVar(value="Build or refresh the local index to search file contents.")
         ttk.Label(toolbar, textvariable=self.status_var, style="Hint.TLabel").pack(side="left")
         ttk.Button(toolbar, text="Find duplicates & versions", command=self._start_duplicates).pack(side="right")
+        self.cancel_button = ttk.Button(toolbar, text="Cancel", command=self._cancel_operation, state="disabled")
+        self.cancel_button.pack(side="right", padx=(6, 0))
+        self.pause_button = ttk.Button(toolbar, text="Pause", command=self._toggle_pause, state="disabled")
+        self.pause_button.pack(side="right", padx=(6, 0))
 
         result_frame = ttk.Frame(outer); result_frame.pack(fill="both", expand=True)
         columns = ("name", "category", "extension", "size", "modified", "topic", "location")
@@ -221,11 +227,40 @@ class SearchDashboardDialog(tk.Toplevel):
         ttk.Entry(parent, textvariable=variable).grid(row=row+1, column=col, sticky="ew", padx=5, pady=(0, 5))
 
     def _close(self) -> None:
+        if self.busy and self.operation_control is not None:
+            if not messagebox.askyesno("Close search window", "Cancel the current index/duplicate operation at the next safe checkpoint and close this window?", parent=self):
+                return
+            self.operation_control.cancel()
         try:
             self.after_cancel(self._after_id)
         except (AttributeError, tk.TclError):
             pass
         self.destroy()
+
+    def _toggle_pause(self) -> None:
+        control = self.operation_control
+        if not self.busy or control is None:
+            return
+        if control.paused:
+            control.resume()
+            self.pause_button.configure(text="Pause")
+            self.status_var.set("Resuming…")
+        else:
+            control.pause()
+            self.pause_button.configure(text="Resume")
+            self.status_var.set("Paused. Progress is retained until you resume.")
+
+    def _cancel_operation(self) -> None:
+        if not self.busy or self.operation_control is None:
+            return
+        if messagebox.askyesno(
+            "Cancel operation",
+            "Stop at the next safe checkpoint? Nothing will be deleted or moved by indexing or duplicate analysis.",
+            parent=self,
+            icon="warning",
+        ):
+            self.operation_control.cancel()
+            self.status_var.set("Cancelling…")
 
     def _refresh_count(self) -> None:
         try:
@@ -303,9 +338,9 @@ class SearchDashboardDialog(tk.Toplevel):
             return
         categories = list(self.categories)
         extension_filters = self.parent_app.extension_filters
-        self._start_worker("index", lambda report: build_index(
+        self._start_worker("index", lambda report, control: build_index(
             sources, categories, extension_filters=extension_filters,
-            progress=report, extract_text=True,
+            progress=report, extract_text=True, control=control,
         ))
 
     def _start_duplicates(self) -> None:
@@ -324,24 +359,37 @@ class SearchDashboardDialog(tk.Toplevel):
         categories = list(self.categories)
         extension_filters = self.parent_app.extension_filters
 
-        def index_then_analyze(report):
+        def index_then_analyze(report, control):
             indexed = build_index(
                 sources, categories, extension_filters=extension_filters,
-                progress=lambda message: report("Indexing for duplicate analysis: " + message),
-                extract_text=True,
+                progress=report, extract_text=True, control=control,
             )
-            result = analyze_duplicates(progress=report)
+            if indexed.get("cancelled"):
+                raise OperationCancelled("Duplicate analysis was cancelled during indexing.")
+            result = analyze_duplicates(progress=report, control=control)
             result["index_result"] = indexed
             return result
 
         self._start_worker("duplicates", index_then_analyze)
 
     def _start_worker(self, kind: str, work) -> None:
+        if self.busy:
+            return
         self.busy = True
+        self.operation_control = OperationControl()
+        self.pause_button.configure(state="normal", text="Pause")
+        self.cancel_button.configure(state="normal")
         self.status_var.set("Working…")
+        control = self.operation_control
+
         def run():
-            try: self.events.put(("done", kind, work(lambda message: self.events.put(("progress", "message", message)))))
-            except Exception as error: self.events.put(("error", kind, str(error)))
+            try:
+                report = lambda message: self.events.put(("progress", kind, message))
+                self.events.put(("done", kind, work(report, control)))
+            except OperationCancelled as error:
+                self.events.put(("cancelled", kind, str(error)))
+            except Exception as error:
+                self.events.put(("error", kind, str(error)))
         threading.Thread(target=run, name=f"sdo-search-{kind}", daemon=True).start()
 
     def _poll(self) -> None:
@@ -349,13 +397,46 @@ class SearchDashboardDialog(tk.Toplevel):
             while True:
                 event, kind, payload = self.events.get_nowait()
                 if event == "progress":
-                    self.status_var.set(str(payload))
+                    if isinstance(payload, dict):
+                        phase = str(payload.get("phase", ""))
+                        if phase == "index":
+                            checked = int(payload.get("files_checked", 0) or 0)
+                            total = int(payload.get("files_indexed", 0) or 0)
+                            self.status_var.set(
+                                f"Indexing {payload.get('current_root','')}: {checked:,} checked, {total:,} indexed, "
+                                f"{int(payload.get('skipped',0) or 0):,} skipped"
+                            )
+                        elif phase == "duplicates_hash":
+                            self.status_var.set(
+                                f"Checking duplicates: {int(payload.get('records_checked',0) or 0):,}/"
+                                f"{int(payload.get('records_total',0) or 0):,} files hashed"
+                            )
+                        elif phase == "duplicates_compare":
+                            self.status_var.set(
+                                f"Comparing document text: {int(payload.get('pairs_checked',0) or 0):,}/"
+                                f"{int(payload.get('candidate_pairs',0) or 0):,} candidate pairs"
+                            )
+                    else:
+                        self.status_var.set(str(payload))
                 elif event == "error":
                     self.busy = False
+                    self.operation_control = None
+                    self.pause_button.configure(state="disabled", text="Pause")
+                    self.cancel_button.configure(state="disabled")
                     self.status_var.set("Operation stopped.")
                     messagebox.showerror("Smart Drive Organizer", str(payload), parent=self)
+                elif event == "cancelled":
+                    self.busy = False
+                    self.operation_control = None
+                    self.pause_button.configure(state="disabled", text="Pause")
+                    self.cancel_button.configure(state="disabled")
+                    self.status_var.set("Operation cancelled safely; local index and source files were preserved.")
+                    messagebox.showinfo("Operation cancelled", str(payload) or "Cancelled at a safe checkpoint.", parent=self)
                 elif event == "done":
                     self.busy = False
+                    self.operation_control = None
+                    self.pause_button.configure(state="disabled", text="Pause")
+                    self.cancel_button.configure(state="disabled")
                     if kind == "index":
                         self.status_var.set(
                             f"Index refreshed: {payload['refreshed']:,} changed/new; {payload['total']:,} total; {payload['skipped']:,} skipped."
