@@ -10,7 +10,7 @@ RELEASE_PAGE_PREFIX = "https://github.com/T3ND41/SmartDriveOrganizer_RepoReady_v
 
 
 def _version_parts(value: str) -> tuple[int, int, int]:
-    match = re.fullmatch(r"v?(\\d+)\\.(\\d+)\\.(\\d+)(?:[-+][0-9A-Za-z.-]+)?", str(value).strip(), re.IGNORECASE)
+    match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?", str(value).strip(), re.IGNORECASE)
     if not match:
         raise ValueError(f"Unrecognised application version: {value!r}")
     return tuple(int(part) for part in match.groups())
