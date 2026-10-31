@@ -134,6 +134,7 @@ class OrganizerApp(tk.Tk):
         self.status_var = tk.StringVar(value="Select one or more drives or folders, then choose an output folder.")
         self.summary_var = tk.StringVar(value="No scan yet.")
         self.progress_var = tk.DoubleVar(value=0)
+        self.active_search_terms: list[str] = []
         self.automation_status_var = tk.StringVar(value="Automatic monitor: not running")
 
         self.plan: Optional[ScanPlan] = None
@@ -394,8 +395,16 @@ class OrganizerApp(tk.Tk):
         counter_row.pack(fill="x", anchor="w", pady=(0, 3))
         try:
             self.counter_logo_photo = self.brand_photo.subsample(4, 4)
-            tk.Label(counter_row, image=self.counter_logo_photo, bg=bg, borderwidth=0).pack(side="left", padx=(0, 7))
+            self.coverage_canvas = tk.Canvas(counter_row, width=48, height=48, bg=bg, highlightthickness=0, borderwidth=0)
+            self.coverage_canvas.pack(side="left", padx=(0, 8))
+            self.coverage_canvas.create_oval(2, 2, 46, 46, outline=border, width=3)
+            self.coverage_arc = self.coverage_canvas.create_arc(
+                2, 2, 46, 46, start=90, extent=0, style="arc", outline=red, width=3
+            )
+            self.coverage_canvas.create_image(24, 24, image=self.counter_logo_photo)
         except (AttributeError, tk.TclError):
+            self.coverage_canvas = None
+            self.coverage_arc = None
             tk.Frame(counter_row, bg=red, width=4, height=20).pack(side="left", padx=(0, 7))
         ttk.Label(counter_row, textvariable=self.telemetry_var, style="PageSub.TLabel", wraplength=950).pack(side="left", anchor="w")
         ttk.Label(footer, textvariable=self.keyword_counts_var, style="PageSub.TLabel", wraplength=950).pack(anchor="w", pady=(0, 4))
@@ -682,9 +691,11 @@ class OrganizerApp(tk.Tk):
             found = max(0, int(payload.get("files_matched", 0) or 0))
             match_rate = float(payload.get("match_percent", (found / checked * 100.0) if checked else 0.0) or 0.0)
             self.progress_var.set(max(0.0, min(100.0, drive_percent)))
+            if self.coverage_canvas is not None and self.coverage_arc is not None:
+                self.coverage_canvas.itemconfigure(self.coverage_arc, extent=-3.6 * max(0.0, min(100.0, drive_percent)))
             self.telemetry_var.set(
-                f"Drives completed: {completed:,}/{total:,} ({drive_percent:.1f}%)"
-                f"   •   Files found: {found:,} of {checked:,} examined ({match_rate:.1f}% match rate)"
+                f"Drive coverage: {drive_percent:.1f}% ({completed:,}/{total:,} drives)"
+                f"   •   Files found: {found:,}/{checked:,} examined ({match_rate:.1f}%)"
             )
             current = str(payload.get("current_drive", "")).strip()
             drive_index = int(payload.get("drive_index", completed + 1) or completed + 1)
@@ -710,7 +721,9 @@ class OrganizerApp(tk.Tk):
             total = max(0, int(payload.get("total", 0) or 0))
             percent = processed / total * 100.0 if total else 0.0
             self.progress_var.set(percent)
-            self.telemetry_var.set(f"Organization: {processed:,}/{total:,} files ({percent:.1f}%)")
+            if self.coverage_canvas is not None and self.coverage_arc is not None:
+                self.coverage_canvas.itemconfigure(self.coverage_arc, extent=-3.6 * max(0.0, min(100.0, percent)))
+            self.telemetry_var.set(f"Organization progress: {percent:.1f}% ({processed:,}/{total:,} files)")
             status = str(payload.get("status", "processing")).replace("_", " ").title()
             self.status_var.set(f"{status}: {payload.get('current_file', '')}")
             return
@@ -787,8 +800,10 @@ class OrganizerApp(tk.Tk):
                 for group in result.discovery_groups[:8]
             ]
             combined_items = topic_items + [f"New: {item}" for item in discovery_items]
+            used_terms = ", ".join(self.active_search_terms[:12]) if self.active_search_terms else "built-in filename patterns"
             self.keyword_counts_var.set(
-                "Keywords / groups found: " + (", ".join(combined_items) if combined_items else "No topic matches")
+                "Search terms used: " + used_terms
+                + "  •  Matching groups/files: " + (", ".join(combined_items) if combined_items else "No topic matches")
             )
             self.discovery_button.configure(state="normal" if result.discovery_groups else "disabled")
             if result.cancelled:
@@ -858,6 +873,33 @@ class OrganizerApp(tk.Tk):
             else:
                 messagebox.showwarning("No matching files", "No files matched the selected categories. Try selecting more file types or another source folder.")
 
+    @staticmethod
+    def _collect_active_search_terms(custom_rules: list[dict], topic_rules: list[dict],
+                                     selected_topics: list[str], categories: list[str]) -> list[str]:
+        """Return the actual configured phrases active for the current scan."""
+        source_rules = topic_rules if selected_topics else (BUILTIN_RULES + custom_rules)
+        terms: list[str] = []
+        seen: set[str] = set()
+        selected_keys = {name.casefold() for name in selected_topics}
+        for rule in source_rules:
+            if selected_topics and str(rule.get("name", "")).casefold() not in selected_keys:
+                continue
+            scopes = rule.get("categories", rule.get("category", "Any"))
+            if isinstance(scopes, str):
+                scopes = [scopes]
+            if scopes and "Any" not in scopes and not any(item in categories for item in scopes):
+                continue
+            values = rule.get("keywords", [])
+            if isinstance(values, str):
+                values = [values]
+            for value in values:
+                phrase = str(value).strip()
+                key = phrase.casefold()
+                if phrase and key not in seen:
+                    terms.append(phrase)
+                    seen.add(key)
+        return terms
+
     def _scan(self) -> None:
         selected_sources = self._selected_source_entries()
         output_text = self.output_var.get().strip()
@@ -882,6 +924,13 @@ class OrganizerApp(tk.Tk):
             messagebox.showwarning("No topics selected", "Select at least one topic group, or create your own using Add / manage my own topic groups.")
             return
         topic_rules = load_topic_rules(topic_rules_file())
+        self.active_search_terms = self._collect_active_search_terms(
+            rules, topic_rules, selected_topics, selected
+        )
+        self.keyword_counts_var.set(
+            "Search terms used: " + (", ".join(self.active_search_terms[:12]) if self.active_search_terms else "built-in filename patterns")
+            + "  •  Matching groups: waiting for scan results…"
+        )
         self._start_job("scan", lambda progress, control: scan_directories(
             sources, output, selected,
             recursive=self.recursive_var.get(),
