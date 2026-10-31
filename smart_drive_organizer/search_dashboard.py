@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox, ttk
 
-from .duplicates import analyze_duplicates
+from .duplicates import analyze_duplicates, recycle_exact_duplicates
 from .search_index import SearchIndex, build_index
 from .operation_control import OperationCancelled, OperationControl
 
@@ -80,8 +80,19 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.tree.pack(side="left", fill="both", expand=True); scroll.pack(side="right", fill="y")
         details = ttk.LabelFrame(body, text="Files in selected group", padding=8)
         details.pack(side="left", fill="both", padx=(10, 0))
-        self.file_list = tk.Listbox(details, width=52, height=23, font=("Segoe UI", 8), selectbackground=red, selectforeground=white)
-        self.file_list.pack(fill="both", expand=True)
+        self.file_list = tk.Listbox(details, width=52, height=8, font=("Segoe UI", 8), selectbackground=red, selectforeground=white)
+        self.file_list.pack(fill="x", expand=False)
+        self.compare_frame = ttk.Frame(details)
+        self.compare_frame.pack(fill="both", expand=True, pady=(8, 0))
+        self.compare_vars = [tk.StringVar(value="Select an exact duplicate group.") for _ in range(2)]
+        for col in range(2):
+            card = ttk.LabelFrame(self.compare_frame, text=f"FILE {col + 1}", padding=6)
+            card.grid(row=0, column=col, sticky="nsew", padx=(0 if col == 0 else 5, 0))
+            ttk.Label(card, textvariable=self.compare_vars[col], wraplength=205, justify="left").pack(anchor="w")
+        self.compare_frame.columnconfigure(0, weight=1)
+        self.compare_frame.columnconfigure(1, weight=1)
+        ttk.Label(details, text="Exact matches are verified by SHA-256. No files are changed during review.", foreground=red, wraplength=420).pack(anchor="w", pady=(7, 0))
+        self.active_group = None
         for i, group in enumerate(self.groups):
             sim = "—" if group.get("similarity") is None else f"{group['similarity']:.0%}"
             self.tree.insert("", "end", iid=str(i), values=(group["kind"], group["count"], sim, group["match"]))
@@ -90,6 +101,8 @@ class DuplicateReviewDialog(tk.Toplevel):
         actions = ttk.Frame(outer); actions.pack(fill="x", pady=(12, 0))
         ttk.Button(actions, text="Open selected file", command=self._open).pack(side="left")
         ttk.Button(actions, text="Show in folder", command=self._reveal).pack(side="left", padx=6)
+        self.recycle_button = ttk.Button(actions, text="Keep newest and recycle exact older copies", command=self._recycle_older, state="disabled")
+        self.recycle_button.pack(side="left", padx=(10, 0))
         ttk.Button(actions, text="Close", command=self.destroy).pack(side="right")
         if self.groups:
             self.tree.selection_set("0"); self._select()
@@ -98,11 +111,76 @@ class DuplicateReviewDialog(tk.Toplevel):
         ids = self.tree.selection()
         self.file_list.delete(0, "end")
         self.active_files = []
-        if not ids: return
+        self.active_group = None
+        self.recycle_button.configure(state="disabled")
+        for value in self.compare_vars:
+            value.set("Select an exact duplicate group to compare files side by side.")
+        if not ids:
+            return
         group = self.groups[int(ids[0])]
+        self.active_group = group
         self.active_files = group.get("files", [])
         for row in self.active_files:
             self.file_list.insert("end", row["path"])
+        if group.get("kind") == "Exact duplicates" and len(self.active_files) >= 2:
+            ordered = sorted(self.active_files, key=lambda row: (float(row.get("modified_ts", 0) or 0), str(row.get("path", "")).casefold()))
+            for index, row in enumerate((ordered[0], ordered[-1])):
+                modified = row.get("modified_ts")
+                stamp = datetime.fromtimestamp(float(modified)).strftime("%Y-%m-%d %H:%M:%S") if modified else "Unknown"
+                self.compare_vars[index].set(
+                    f"{row.get('name','')}\n\nModified: {stamp}\nSize: {_size(row.get('size_bytes',0))}\n\n{row.get('path','')}"
+                )
+            if len(ordered) > 2:
+                self.compare_vars[1].set(self.compare_vars[1].get() + f"\n\nPlus {len(ordered)-2:,} older exact copy/copies.")
+            self.recycle_button.configure(state="normal")
+
+    def _recycle_older(self) -> None:
+        group = self.active_group
+        if not group or group.get("kind") != "Exact duplicates" or len(group.get("files", [])) < 2:
+            return
+        files = list(group["files"])
+        def modified(row):
+            value = row.get("modified_ts")
+            try:
+                return float(value) if value is not None else Path(row["path"]).stat().st_mtime
+            except (OSError, KeyError, TypeError, ValueError):
+                return 0.0
+        keeper = max(files, key=lambda row: (modified(row), str(row.get("path", "")).casefold()))
+        older = [row for row in files if str(row.get("path", "")) != str(keeper.get("path", ""))]
+        prompt = (
+            "These files were byte-for-byte identical when scanned. The app will verify their SHA-256 again before action.\n\n"
+            f"KEEP newest:\n{keeper.get('path','')}\n\n"
+            "SEND older exact copies to the Recycle Bin:\n"
+            + "\n".join(str(row.get("path", "")) for row in older[:8])
+            + (f"\n…and {len(older)-8:,} more." if len(older) > 8 else "")
+            + "\n\nThis cannot delete near-matches or possible versions. Continue?"
+        )
+        if not messagebox.askyesno("Confirm Recycle Bin action", prompt, parent=self, icon="warning"):
+            return
+        try:
+            result = recycle_exact_duplicates(group, keeper["path"])
+        except Exception as error:
+            messagebox.showerror("Could not recycle duplicates", str(error), parent=self)
+            return
+        removed = set(result["recycled"])
+        group["files"] = [row for row in group["files"] if str(Path(row["path"]).resolve()) not in removed]
+        group["count"] = len(group["files"])
+        self.file_list.delete(0, "end")
+        for row in group["files"]:
+            self.file_list.insert("end", row["path"])
+        if group["count"] < 2:
+            self.tree.delete(self.tree.selection()[0])
+            self.recycle_button.configure(state="disabled")
+            self.active_group = None
+            for value in self.compare_vars:
+                value.set("Exact duplicate group resolved.")
+        else:
+            self.tree.set(self.tree.selection()[0], "count", group["count"])
+            self._select()
+        details = f"Moved {result['recycled_count']:,} exact duplicate(s) to the Recycle Bin. Kept:\n{result['keeper']}"
+        if result["skipped"] or result["errors"]:
+            details += "\n\nLeft untouched / errors:\n" + "\n".join((result["skipped"] + result["errors"])[:8])
+        messagebox.showinfo("Duplicate review action complete", details, parent=self)
 
     def _selected_file(self) -> Path | None:
         selection = self.file_list.curselection()
