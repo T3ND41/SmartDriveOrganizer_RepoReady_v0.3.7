@@ -58,6 +58,13 @@ class DuplicateReviewDialog(tk.Toplevel):
             palette["white"], palette["red"], palette["muted"],
         )
         self.configure(bg=bg)
+        self.feature_icons = getattr(parent, "feature_icons", {})
+        def feature_button(container: tk.Misc, feature: str, **options) -> ttk.Button:
+            icon = self.feature_icons.get(feature)
+            if icon is not None:
+                options["image"] = icon
+                options["compound"] = "left"
+            return ttk.Button(container, **options)
         style = ttk.Style(self)
         try: style.theme_use("clam")
         except tk.TclError: pass
@@ -284,8 +291,8 @@ class SearchDashboardDialog(tk.Toplevel):
         self.query_entry = ttk.Entry(search_row, textvariable=self.query_var, font=("Segoe UI", 13))
         self.query_entry.pack(side="left", fill="x", expand=True)
         self.query_entry.bind("<Return>", lambda _e: self._search())
-        ttk.Button(search_row, text="SEARCH", style="Primary.TButton", command=self._search).pack(side="left", padx=(8, 0))
-        ttk.Button(search_row, text="Build / refresh index", command=self._start_index).pack(side="left", padx=(8, 0))
+        feature_button(search_row, "deep-search", text="SEARCH", style="Primary.TButton", command=self._search).pack(side="left", padx=(8, 0))
+        feature_button(search_row, "deep-search", text="Build / refresh index", command=self._start_index).pack(side="left", padx=(8, 0))
 
         filters = ttk.LabelFrame(outer, text="FILTERS", padding=10)
         filters.pack(fill="x", pady=(0, 10))
@@ -312,7 +319,7 @@ class SearchDashboardDialog(tk.Toplevel):
         toolbar = ttk.Frame(outer); toolbar.pack(fill="x", pady=(0, 6))
         self.status_var = tk.StringVar(value="Build or refresh the local index to search file contents.")
         ttk.Label(toolbar, textvariable=self.status_var, style="Hint.TLabel").pack(side="left")
-        ttk.Button(toolbar, text="Find duplicates & versions", command=self._start_duplicates).pack(side="right")
+        feature_button(toolbar, "pattern-scan", text="Find duplicates & versions", command=self._start_duplicates).pack(side="right")
         self.cancel_button = ttk.Button(toolbar, text="Cancel", command=self._cancel_operation, state="disabled")
         self.cancel_button.pack(side="right", padx=(6, 0))
         self.pause_button = ttk.Button(toolbar, text="Pause", command=self._toggle_pause, state="disabled")
