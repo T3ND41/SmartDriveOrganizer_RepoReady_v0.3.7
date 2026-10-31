@@ -11,7 +11,7 @@ from tkinter import filedialog, messagebox, ttk
 from typing import Callable, Optional
 
 from . import __version__
-from .classifier import load_custom_rules, save_custom_rules, load_topic_rules, save_topic_rules
+from .classifier import BUILTIN_RULES, load_custom_rules, save_custom_rules, load_topic_rules, save_topic_rules
 from .automation import (
     is_service_running, load_settings, mark_undo_restored_sources, read_service_status, settings_path, topic_rules_path,
     start_background_monitor, stop_background_monitor,
@@ -33,6 +33,33 @@ from .operation_control import OperationCancelled, OperationControl
 
 CATEGORIES = ["Documents", "Images", "Videos", "Audio", "Archives", "Code", "Applications", "Fonts", "3D Models", "Others"]
 MAX_PREVIEW_ROWS = 1200
+FEATURE_ICON_ORDER = (
+    "deep-search", "pattern-scan", "smart-grouping", "persistent-rules",
+    "keyword-routing", "multi-drive", "copy-mode", "move-mode",
+    "safe-naming", "background-monitor", "extension-filter", "workspace",
+)
+NAV_FEATURE_ICONS = {
+    "location": "multi-drive", "drive": "multi-drive",
+    "types": "extension-filter", "document": "extension-filter",
+    "tag": "keyword-routing", "search": "deep-search",
+    "memory": "persistent-rules", "gear": "background-monitor",
+    "activity": "pattern-scan", "branch": "workspace", "grid": "workspace",
+}
+
+
+def load_feature_icon_atlas(parent: tk.Misc, theme_name: str) -> tuple[tk.PhotoImage | None, dict[str, tk.PhotoImage]]:
+    """Load the supplied brand icon atlas and crop its twelve 32px feature marks."""
+    theme_folder = "light" if theme_name == "light" else "dark"
+    atlas_path = Path(__file__).resolve().parent / "assets" / f"feature_icons_{theme_folder}.png"
+    try:
+        atlas = tk.PhotoImage(master=parent, file=str(atlas_path))
+    except (tk.TclError, OSError):
+        return None, {}
+    icons: dict[str, tk.PhotoImage] = {}
+    for index, name in enumerate(FEATURE_ICON_ORDER):
+        x, y = (index % 4) * 32, (index // 4) * 32
+        icons[name] = atlas.copy(from_coords=(x, y, x + 32, y + 32))
+    return atlas, icons
 
 
 def app_data_dir() -> Path:
@@ -68,14 +95,14 @@ def load_theme_preference() -> str:
     try:
         value = json.loads(ui_preferences_path().read_text(encoding="utf-8"))
         theme = str(value.get("theme", "light")).casefold()
-        return theme if theme in {"light", "dark"} else "light"
+        return theme if theme in {"light", "dark", "redline"} else "light"
     except (OSError, json.JSONDecodeError, AttributeError, TypeError):
         return "light"
 
 
 def save_theme_preference(theme: str) -> None:
-    if theme not in {"light", "dark"}:
-        raise ValueError("Theme must be Light or Dark.")
+    if theme not in {"light", "dark", "redline"}:
+        raise ValueError("Theme must be Light, Dark or Redline.")
     target = ui_preferences_path()
     target.write_text(json.dumps({"theme": theme}, indent=2), encoding="utf-8")
 
@@ -88,7 +115,7 @@ class OrganizerApp(tk.Tk):
         self.minsize(980, 700)
         self.theme_name = load_theme_preference()
         self.theme_var = tk.StringVar(value=self.theme_name.title())
-        self.configure(bg="#F4F4F5" if self.theme_name == "light" else "#151515")
+        self.configure(bg="#F4F4F5" if self.theme_name == "light" else ("#101010" if self.theme_name == "redline" else "#151515"))
 
         self.source_entries: list[tuple[Path, str]] = []
         self.output_var = tk.StringVar(value=str(Path.home() / "Documents" / "Smart Drive Organizer" / "Organized Files"))
@@ -121,6 +148,9 @@ class OrganizerApp(tk.Tk):
         if self.theme_name == "dark":
             bg, card, ink, black, white, red, muted, border = "#151515", "#242424", "#F4F4F5", "#090909", "#FFFFFF", "#D71920", "#A1A1AA", "#3F3F46"
             hover, disabled, progress_trough, badge_bg = "#303030", "#484848", "#3F3F46", "#3A191B"
+        elif self.theme_name == "redline":
+            bg, card, ink, black, white, red, muted, border = "#101010", "#191919", "#FFFFFF", "#000000", "#FFFFFF", "#D71920", "#C4C4C4", "#4B2527"
+            hover, disabled, progress_trough, badge_bg = "#292929", "#5A292B", "#3D1719", "#351316"
         else:
             bg, card, ink, black, white, red, muted, border = "#F4F4F5", "#FFFFFF", "#101010", "#101010", "#FFFFFF", "#D71920", "#737373", "#E4E4E7"
             hover, disabled, progress_trough, badge_bg = "#F1F1F1", "#E5E5E5", "#E5E5E5", "#FEE2E2"
@@ -145,7 +175,7 @@ class OrganizerApp(tk.Tk):
         style.configure("TButton", font=("Segoe UI", 9), padding=(10, 7), background=card, foreground=ink)
         style.map("TButton", background=[("active", hover), ("disabled", disabled)])
         style.configure("Primary.TButton", font=("Segoe UI", 9, "bold"), padding=(16, 10), background=red, foreground=white)
-        style.map("Primary.TButton", background=[("active", "#B9151B"), ("disabled", "#8E5558" if self.theme_name == "dark" else "#E7A1A4")], foreground=[("disabled", white)])
+        style.map("Primary.TButton", background=[("active", "#B9151B"), ("disabled", "#8E5558" if self.theme_name in {"dark", "redline"} else "#E7A1A4")], foreground=[("disabled", white)])
         style.configure("Dark.TButton", font=("Segoe UI", 9, "bold"), padding=(13, 9), background=black, foreground=white)
         style.map("Dark.TButton", background=[("active", "#333333"), ("disabled", "#777777")])
         style.configure("Secondary.TButton", font=("Segoe UI", 9), padding=(10, 7), background=bg, foreground=ink)
@@ -155,6 +185,7 @@ class OrganizerApp(tk.Tk):
         style.map("Treeview.Heading", background=[("active", red)])
         style.configure("Red.Horizontal.TProgressbar", troughcolor=progress_trough, background=red, bordercolor=progress_trough, lightcolor=red, darkcolor=red)
         self.configure(bg=bg)
+        self.feature_icon_atlas, self.feature_icons = load_feature_icon_atlas(self, self.theme_name)
 
         shell = tk.Frame(self, bg=bg)
         shell.pack(fill="both", expand=True)
@@ -174,64 +205,14 @@ class OrganizerApp(tk.Tk):
         tk.Label(sidebar, text="WORKSPACE", bg=black, fg="#A3A3A3", font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=20, pady=(0, 8))
 
         self.nav_icon_photos = []
-        icon_assets = {
-            "search": "deep-search",
-            "drive": "multi-drive",
-            "document": "extension-filter",
-            "tag": "smart-grouping",
-            "memory": "persistent-rules",
-            "gear": "background-monitor",
-        }
-
         def nav_icon(parent: tk.Misc, kind: str, background: str, accent: bool = False) -> tk.Widget:
-            asset_name = icon_assets.get(kind)
-            if asset_name:
-                asset_path = Path(__file__).resolve().parent / "assets" / "icons" / "dark" / f"{asset_name}.png"
-                if asset_path.is_file():
-                    try:
-                        photo = tk.PhotoImage(file=str(asset_path))
-                        self.nav_icon_photos.append(photo)
-                        return tk.Label(parent, image=photo, bg=background, borderwidth=0)
-                    except (tk.TclError, OSError):
-                        pass
+            asset_name = NAV_FEATURE_ICONS.get(kind, "workspace")
+            photo = self.feature_icons.get(asset_name)
+            if photo is not None:
+                return tk.Label(parent, image=photo, bg=background, borderwidth=0)
             canvas = tk.Canvas(parent, width=24, height=24, bg=background, highlightthickness=0, borderwidth=0)
-            stroke = "#FFFFFF"
-            mark = "#FFFFFF" if accent else red
-            def line(*coords, color=stroke, width=1.8):
-                canvas.create_line(*coords, fill=color, width=width, capstyle="round", joinstyle="round")
-            if kind == "grid":
-                for x, y in ((4,4),(13,4),(4,13),(13,13)):
-                    canvas.create_rectangle(x,y,x+6,y+6,outline=stroke,width=1.5)
-            elif kind == "drive":
-                for y in (5,12):
-                    canvas.create_rectangle(3,y,20,y+5,outline=stroke,width=1.4)
-                    canvas.create_oval(15,y+1,17,y+3,fill=mark,outline=mark)
-            elif kind == "document":
-                canvas.create_rectangle(5,2,17,22,outline=stroke,width=1.5)
-                line(8,9,14,9); line(8,13,14,13); line(8,17,12,17)
-            elif kind == "tag":
-                canvas.create_polygon(3,5,14,5,21,12,12,21,3,12,outline=stroke,fill="",width=1.5)
-                canvas.create_oval(6,8,8,10,outline=mark,width=1.5)
-            elif kind == "search":
-                canvas.create_oval(3,3,15,15,outline=stroke,width=1.8)
-                line(14,14,21,21,color=mark,width=2.4)
-            elif kind == "memory":
-                canvas.create_oval(4,3,19,18,outline=stroke,width=1.5)
-                line(8,11,11,8); line(11,8,15,11); line(15,11,11,15); line(11,15,8,11,color=mark)
-                line(11,18,11,22); line(8,22,14,22)
-            elif kind == "gear":
-                canvas.create_oval(5,5,19,19,outline=stroke,width=1.7)
-                canvas.create_oval(10,10,14,14,outline=mark,width=1.6)
-                for x1,y1,x2,y2 in ((12,1,12,5),(12,19,12,23),(1,12,5,12),(19,12,23,12),(4,4,7,7),(17,17,20,20),(4,20,7,17),(17,7,20,4)):
-                    line(x1,y1,x2,y2,width=1.7)
-            elif kind == "activity":
-                line(3,19,3,12); line(9,19,9,6,color=mark,width=2.2); line(15,19,15,9); line(21,19,21,3)
-                line(2,21,22,21)
-            elif kind == "branch":
-                canvas.create_oval(2,2,8,8,outline=stroke,width=1.5)
-                canvas.create_oval(16,2,22,8,outline=stroke,width=1.5)
-                canvas.create_oval(9,16,15,22,outline=mark,width=1.8)
-                line(5,8,5,12,14,12,19,8); line(12,12,12,16)
+            canvas.create_oval(4, 4, 20, 20, outline=white, width=1.7)
+            canvas.create_oval(9, 9, 15, 15, fill=red, outline=red)
             return canvas
 
         def nav_button(label: str, command: Callable[[], None], icon: str, accent: bool = False) -> None:
@@ -270,7 +251,7 @@ class OrganizerApp(tk.Tk):
         tk.Label(top_left, text="A safer, clearer way to organize your files", bg=card, fg=muted, font=("Segoe UI", 8)).pack(anchor="w", pady=(1, 0))
         tk.Label(topbar, text="●  LOCAL-FIRST", bg=badge_bg, fg=red, font=("Segoe UI", 8, "bold"), padx=10, pady=7).pack(side="right", padx=(8, 20), pady=17)
         ttk.Label(topbar, text="Theme", background=card, foreground=muted).pack(side="right", padx=(12, 4))
-        theme_picker = ttk.Combobox(topbar, textvariable=self.theme_var, values=("Light", "Dark"), state="readonly", width=8)
+        theme_picker = ttk.Combobox(topbar, textvariable=self.theme_var, values=("Light", "Dark", "Redline"), state="readonly", width=10)
         theme_picker.pack(side="right", pady=17)
         theme_picker.bind("<<ComboboxSelected>>", self._change_theme)
         tk.Frame(main, bg=red, height=3).pack(fill="x")
@@ -425,7 +406,7 @@ class OrganizerApp(tk.Tk):
 
     def _change_theme(self, _event=None) -> None:
         selected = self.theme_var.get().strip().casefold()
-        if selected not in {"light", "dark"} or selected == self.theme_name:
+        if selected not in {"light", "dark", "redline"} or selected == self.theme_name:
             return
         if self.busy:
             self.theme_var.set(self.theme_name.title())
