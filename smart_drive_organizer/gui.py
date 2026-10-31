@@ -206,10 +206,15 @@ class OrganizerApp(tk.Tk):
         try:
             self.brand_photo = tk.PhotoImage(file=str(logo_path))
             self.iconphoto(True, self.brand_photo)
-            tk.Label(sidebar, image=self.brand_photo, bg=black, borderwidth=0).pack(anchor="w", padx=20, pady=(22, 10))
         except (tk.TclError, OSError):
             # Never substitute a hand-drawn mark for the approved supplied logo.
             self.brand_photo = None
+        wordmark_path = assets_dir / "brand_wordmark.png"
+        try:
+            self.brand_wordmark_photo = tk.PhotoImage(file=str(wordmark_path))
+            tk.Label(sidebar, image=self.brand_wordmark_photo, bg=black, borderwidth=0).pack(anchor="w", padx=20, pady=(22, 20))
+        except (tk.TclError, OSError):
+            self.brand_wordmark_photo = None
         if os.name == "nt":
             app_icon = assets_dir / "app_icon.ico"
             if app_icon.is_file():
@@ -217,8 +222,6 @@ class OrganizerApp(tk.Tk):
                     self.iconbitmap(default=str(app_icon))
                 except tk.TclError:
                     pass
-        tk.Label(sidebar, text="SMART DRIVE", bg=black, fg=white, font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=20)
-        tk.Label(sidebar, text="ORGANIZER", bg=black, fg=red, font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=20, pady=(0, 22))
         tk.Frame(sidebar, bg=red, height=3).pack(fill="x", padx=20, pady=(0, 20))
         tk.Label(sidebar, text="WORKSPACE", bg=black, fg="#A3A3A3", font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=20, pady=(0, 8))
 
