@@ -387,9 +387,16 @@ class OrganizerApp(tk.Tk):
         ttk.Label(footer, textvariable=self.summary_var, style="PageSub.TLabel").pack(anchor="w", pady=(2, 7))
         self.progress = ttk.Progressbar(footer, variable=self.progress_var, maximum=100, mode="determinate", style="Red.Horizontal.TProgressbar")
         self.progress.pack(fill="x", pady=(0, 5))
-        self.telemetry_var = tk.StringVar(value="Drive coverage: not started   •   Files found: —")
+        self.telemetry_var = tk.StringVar(value="Drives scanned: 0%   •   Files found: —")
         self.keyword_counts_var = tk.StringVar(value="Keywords / groups found: —")
-        ttk.Label(footer, textvariable=self.telemetry_var, style="PageSub.TLabel", wraplength=950).pack(anchor="w", pady=(0, 3))
+        counter_row = tk.Frame(footer, bg=bg)
+        counter_row.pack(fill="x", anchor="w", pady=(0, 3))
+        try:
+            self.counter_logo_photo = self.brand_photo.subsample(4, 4)
+            tk.Label(counter_row, image=self.counter_logo_photo, bg=bg, borderwidth=0).pack(side="left", padx=(0, 7))
+        except (AttributeError, tk.TclError):
+            tk.Frame(counter_row, bg=red, width=4, height=20).pack(side="left", padx=(0, 7))
+        ttk.Label(counter_row, textvariable=self.telemetry_var, style="PageSub.TLabel", wraplength=950).pack(side="left", anchor="w")
         ttk.Label(footer, textvariable=self.keyword_counts_var, style="PageSub.TLabel", wraplength=950).pack(anchor="w", pady=(0, 4))
         ttk.Label(footer, textvariable=self.status_var, style="PageSub.TLabel", wraplength=950).pack(anchor="w")
         ttk.Label(footer, textvariable=self.automation_status_var, style="PageSub.TLabel", wraplength=950).pack(anchor="w", pady=(4, 0))
@@ -770,8 +777,23 @@ class OrganizerApp(tk.Tk):
             assert isinstance(result, ScanPlan)
             self.plan = result
             self._show_plan(result)
+            topic_items = [
+                f"{name} ({count:,})"
+                for name, count in sorted(result.keyword_counts.items(), key=lambda item: (-item[1], item[0].casefold()))[:8]
+            ]
+            discovery_items = [
+                f"{group.phrase} ({group.file_count:,} files)"
+                for group in result.discovery_groups[:8]
+            ]
+            combined_items = topic_items + [f"New: {item}" for item in discovery_items]
+            self.keyword_counts_var.set(
+                "Keywords / groups found: " + (", ".join(combined_items) if combined_items else "No topic matches")
+            )
             self.discovery_button.configure(state="normal" if result.discovery_groups else "disabled")
-            if result.discovery_groups:
+            if result.cancelled:
+                self.apply_button.configure(state="disabled")
+                self.status_var.set("Scan cancelled. Partial results are displayed for information; run a complete scan before applying.")
+            elif result.discovery_groups:
                 self.status_var.set(f"Found {len(result.discovery_groups):,} new recurring filename pattern(s). Review them before accepting any new group.")
                 self.after(180, self._review_discoveries)
         elif self.job_kind == "apply":
@@ -820,7 +842,7 @@ class OrganizerApp(tk.Tk):
             f"{plan.skipped_count:,} skipped; {len(plan.discovery_groups):,} new recurring patterns found. "
             + (f"Showing first {MAX_PREVIEW_ROWS:,} rows." if extra else "")
         )
-        self.apply_button.configure(state="normal" if plan.files else "disabled")
+        self.apply_button.configure(state="normal" if plan.files and not plan.cancelled else "disabled")
         if plan.warnings:
             self.status_var.set(f"Scan completed with {len(plan.warnings)} warning(s). First: {plan.warnings[0]}")
         else:
