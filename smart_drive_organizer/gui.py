@@ -711,9 +711,11 @@ class OrganizerApp(tk.Tk):
                     ((str(k), int(v)) for k, v in keywords.items()),
                     key=lambda item: (-item[1], item[0].casefold()),
                 )[:12]
+                used_terms = ", ".join(self.active_search_terms[:12]) if self.active_search_terms else "built-in filename patterns"
                 self.keyword_counts_var.set(
-                    "Keywords / groups found: " +
-                    (", ".join(f"{name} ({count:,})" for name, count in top) if top else "No topic matches yet")
+                    "Search terms used: " + used_terms
+                    + "  •  Matching groups/files found: "
+                    + (", ".join(f"{name} ({count:,})" for name, count in top) if top else "No topic matches yet")
                 )
             return
         if phase == "apply":
@@ -749,6 +751,8 @@ class OrganizerApp(tk.Tk):
         self.job_kind = kind
         self.operation_control = OperationControl()
         self.progress_var.set(0)
+        if self.coverage_canvas is not None and self.coverage_arc is not None:
+            self.coverage_canvas.itemconfigure(self.coverage_arc, extent=0)
         self.telemetry_var.set("Preparing operation…")
         self.keyword_counts_var.set("Keywords / groups found: collecting…")
         self._set_busy(True, "Working…")
@@ -875,14 +879,15 @@ class OrganizerApp(tk.Tk):
 
     @staticmethod
     def _collect_active_search_terms(custom_rules: list[dict], topic_rules: list[dict],
-                                     selected_topics: list[str], categories: list[str]) -> list[str]:
+                                     selected_topics: list[str], categories: list[str],
+                                     topic_filter_enabled: bool) -> list[str]:
         """Return the actual configured phrases active for the current scan."""
-        source_rules = topic_rules if selected_topics else (BUILTIN_RULES + custom_rules)
+        source_rules = topic_rules if topic_filter_enabled else (BUILTIN_RULES + custom_rules)
         terms: list[str] = []
         seen: set[str] = set()
         selected_keys = {name.casefold() for name in selected_topics}
         for rule in source_rules:
-            if selected_topics and str(rule.get("name", "")).casefold() not in selected_keys:
+            if topic_filter_enabled and str(rule.get("name", "")).casefold() not in selected_keys:
                 continue
             scopes = rule.get("categories", rule.get("category", "Any"))
             if isinstance(scopes, str):
@@ -925,7 +930,7 @@ class OrganizerApp(tk.Tk):
             return
         topic_rules = load_topic_rules(topic_rules_file())
         self.active_search_terms = self._collect_active_search_terms(
-            rules, topic_rules, selected_topics, selected
+            rules, topic_rules, selected_topics, selected, self.topic_filter_var.get()
         )
         self.keyword_counts_var.set(
             "Search terms used: " + (", ".join(self.active_search_terms[:12]) if self.active_search_terms else "built-in filename patterns")
