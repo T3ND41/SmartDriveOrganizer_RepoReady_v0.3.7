@@ -13,7 +13,7 @@ from tkinter import messagebox, ttk
 from .duplicates import analyze_duplicates, recycle_exact_duplicates
 from .search_index import SearchIndex, build_index
 from .operation_control import OperationCancelled, OperationControl
-from .theme import palette_for
+from .theme import apply_dialog_theme, palette_for
 
 
 def _open_path(path: Path) -> None:
@@ -50,7 +50,7 @@ class DuplicateReviewDialog(tk.Toplevel):
         self.grab_set()
         self.groups = result.get("exact", []) + result.get("versions", []) + result.get("near", [])
         self.active_files: list[dict] = []
-        palette = palette_for(parent)
+        palette = apply_dialog_theme(self, parent)
         bg, card, ink, black, white, red, muted = (
             palette["bg"], palette["card"], palette["ink"], palette["black"],
             palette["white"], palette["red"], palette["muted"],
@@ -107,8 +107,8 @@ class DuplicateReviewDialog(tk.Toplevel):
         ttk.Label(details, text="Exact matches are verified by SHA-256. No files are changed during review.", foreground=red, wraplength=420).pack(anchor="w", pady=(7, 0))
         self.active_group = None
         self.tree.tag_configure("exact", background="#FEE2E2" if self.theme_name == "light" else "#4A171B", foreground="#7F1D1D" if self.theme_name == "light" else "#FFFFFF")
-        self.tree.tag_configure("version", background="#FEF3C7" if self.theme_name == "light" else "#45351A", foreground="#78350F" if self.theme_name == "light" else "#FFFFFF")
-        self.tree.tag_configure("near", background="#E0F2FE" if self.theme_name == "light" else "#183247", foreground="#075985" if self.theme_name == "light" else "#FFFFFF")
+        self.tree.tag_configure("version", background="#E4E4E7" if self.theme_name == "light" else "#303030", foreground="#101010" if self.theme_name == "light" else "#FFFFFF")
+        self.tree.tag_configure("near", background="#F4F4F5" if self.theme_name == "light" else "#242424", foreground="#737373" if self.theme_name == "light" else "#C4C4C4")
         for i, group in enumerate(self.groups):
             sim = "—" if group.get("similarity") is None else f"{group['similarity']:.0%}"
             kind = str(group.get("kind", ""))
