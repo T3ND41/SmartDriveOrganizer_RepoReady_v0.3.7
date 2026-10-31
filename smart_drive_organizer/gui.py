@@ -59,7 +59,10 @@ def load_feature_icon_atlas(parent: tk.Misc, theme_name: str) -> tuple[tk.PhotoI
     icons: dict[str, tk.PhotoImage] = {}
     for index, name in enumerate(FEATURE_ICON_ORDER):
         x, y = (index % 4) * 32, (index // 4) * 32
-        icons[name] = atlas.copy(from_coords=(x, y, x + 32, y + 32))
+        icon = tk.PhotoImage(master=parent, width=32, height=32)
+        # Tk PhotoImage.copy() does not expose the Tcl -from option.
+        icon.tk.call(icon, "copy", atlas, "-from", x, y, x + 32, y + 32)
+        icons[name] = icon
     return atlas, icons
 
 
