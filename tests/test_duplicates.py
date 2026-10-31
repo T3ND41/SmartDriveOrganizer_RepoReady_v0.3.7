@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from smart_drive_organizer.duplicates import analyze_duplicates
+from smart_drive_organizer.duplicates import analyze_duplicates, recycle_exact_duplicates
 from smart_drive_organizer.search_index import SearchIndex
 
 
@@ -94,6 +94,67 @@ class DuplicateDetectionTests(unittest.TestCase):
             self.assertEqual(result["records_checked"], 1)
             self.assertEqual(result["index_total"], 2)
             self.assertTrue(result["truncated"])
+
+
+    def test_exact_duplicate_recycle_action_keeps_chosen_file_and_removes_other_index_record(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            first, second = root / "Older.pdf", root / "Newer.pdf"
+            first.write_bytes(b"identical approved content")
+            second.write_bytes(b"identical approved content")
+            database = root / "index.sqlite3"
+            index = SearchIndex(database)
+            index.upsert_file(first, "Documents", "shared body", "Statements", text_indexed=True)
+            index.upsert_file(second, "Documents", "shared body", "Statements", text_indexed=True)
+            index.close()
+            group = analyze_duplicates(database)["exact"][0]
+            recycled = []
+            result = recycle_exact_duplicates(
+                group, second, database=database, recycle=lambda path: recycled.append(path)
+            )
+            self.assertEqual(recycled, [str(first.resolve())])
+            self.assertEqual(result["recycled_count"], 1)
+            self.assertTrue(second.is_file())
+            index = SearchIndex(database)
+            rows = index.search(query="shared body")
+            index.close()
+            self.assertEqual([row["path"] for row in rows], [str(second.resolve())])
+
+    def test_non_exact_duplicate_groups_are_never_eligible_for_recycling(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "Contract v2.pdf"
+            path.write_bytes(b"new contract")
+            recycled = []
+            with self.assertRaisesRegex(ValueError, "Only byte-for-byte exact"):
+                recycle_exact_duplicates(
+                    {"kind": "Possible document versions", "files": [{"path": str(path)}]},
+                    path, recycle=lambda value: recycled.append(value),
+                )
+            self.assertEqual(recycled, [])
+            self.assertTrue(path.is_file())
+
+    def test_changed_copy_is_left_untouched_after_duplicate_review(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            first, second = root / "A.pdf", root / "B.pdf"
+            first.write_bytes(b"identical before review")
+            second.write_bytes(b"identical before review")
+            database = root / "index.sqlite3"
+            index = SearchIndex(database)
+            index.upsert_file(first, "Documents")
+            index.upsert_file(second, "Documents")
+            index.close()
+            group = analyze_duplicates(database)["exact"][0]
+            second.write_bytes(b"changed after review")
+            recycled = []
+            result = recycle_exact_duplicates(
+                group, first, database=database, recycle=lambda value: recycled.append(value)
+            )
+            self.assertEqual(recycled, [])
+            self.assertEqual(len(result["skipped"]), 1)
+            self.assertTrue(first.is_file())
+            self.assertTrue(second.is_file())
+
 
 
 if __name__ == "__main__":
