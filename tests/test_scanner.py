@@ -211,8 +211,11 @@ class ScannerTests(unittest.TestCase):
             (project / ".venv" / "Monthly Statement.pdf").write_bytes(b"x")
             (root / "Monthly Statement.pdf").write_bytes(b"x")
             plan = scan_directory(root, Path(temp) / "out", ["Documents"], read_contents=False)
-            self.assertEqual(len(plan.files), 1)
-            self.assertEqual(plan.files[0].source.name, "Monthly Statement.pdf")
+            self.assertEqual({item.source for item in plan.files}, {
+                project / "Monthly Statement.pdf", root / "Monthly Statement.pdf"
+            })
+            self.assertTrue(any(".git" in item for item in plan.skipped_locations))
+            self.assertTrue(any(".venv" in item for item in plan.skipped_locations))
 
     def test_multiple_sources_collect_into_one_output_plan(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -307,8 +310,8 @@ class ScannerTests(unittest.TestCase):
             (root / "Boot" / "BCD.ini").write_bytes(b"boot")
             (root / "EFI" / "Microsoft" / "Boot" / "boot.ini").write_bytes(b"efi")
             plan = scan_directory(root, Path(temp) / "output", ["Documents"], read_contents=False)
-            self.assertEqual({item.source.name for item in plan.files}, {"LPO_2024.pdf"})
-            self.assertEqual(len(plan.discovery_candidates), 1)
+            self.assertEqual({item.source.name for item in plan.files}, {"LPO_2024.pdf", "LPO_cache.pdf"})
+            self.assertEqual(len(plan.discovery_candidates), 2)
 
 
     def test_cancelled_scan_returns_partial_plan_without_applying_files(self):
