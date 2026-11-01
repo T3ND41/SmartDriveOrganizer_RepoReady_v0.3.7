@@ -112,3 +112,16 @@ class WorkflowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScanCoverageTests(unittest.TestCase):
+    def test_scan_plan_is_incomplete_when_locations_are_skipped_or_inaccessible(self):
+        from smart_drive_organizer.models import ScanPlan
+        plan = ScanPlan(Path("source"), Path("output"), ["Documents"])
+        self.assertTrue(plan.coverage_complete)
+        plan.skipped_locations.append("source/System Volume Information")
+        self.assertFalse(plan.coverage_complete)
+        plan.skipped_locations.clear()
+        plan.inaccessible_locations.append("source/private")
+        self.assertFalse(plan.coverage_complete)
+
