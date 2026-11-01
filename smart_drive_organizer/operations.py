@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+from . import __version__
 from .models import ScanPlan
 from .operation_control import OperationCancelled, OperationControl
 
@@ -162,7 +163,7 @@ def run_plan(
     journal_path = history_dir / f"run_{run_id}.json"
     journal: Dict = {
         "app": "Smart Drive Organizer",
-        "version": "0.7.0",
+        "version": __version__,
         "run_id": run_id,
         "mode": mode,
         "origin": origin,
