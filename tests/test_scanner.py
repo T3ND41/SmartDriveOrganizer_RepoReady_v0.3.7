@@ -187,7 +187,7 @@ class ScannerTests(unittest.TestCase):
             plan = scan_directory(root, output, ["Documents"], read_contents=False)
 
             self.assertEqual(len(plan.files), 1)
-            self.assertEqual(plan.files[0].source.name, "Monthly Statement.pdf")
+            self.assertEqual(plan.files[0].source, root / "Monthly Statement.pdf")
             self.assertTrue(all(output not in item.source.parents for item in plan.files))
 
     def test_protected_system_folder_cannot_be_selected_as_source(self):
@@ -198,7 +198,7 @@ class ScannerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 scan_directory(source, Path(temp) / "out", ["Documents"])
 
-    def test_git_and_venv_are_skipped(self):
+    def test_project_documents_are_scanned_but_git_and_venv_are_skipped(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "source"
             project = root / "sample_project"
@@ -208,8 +208,11 @@ class ScannerTests(unittest.TestCase):
             (project / ".venv" / "Monthly Statement.pdf").write_bytes(b"x")
             (root / "Monthly Statement.pdf").write_bytes(b"x")
             plan = scan_directory(root, Path(temp) / "out", ["Documents"], read_contents=False)
-            self.assertEqual(len(plan.files), 1)
-            self.assertEqual(plan.files[0].source.name, "Monthly Statement.pdf")
+            self.assertEqual({item.source for item in plan.files}, {
+                project / "Monthly Statement.pdf", root / "Monthly Statement.pdf"
+            })
+            self.assertTrue(any(".git" in item for item in plan.skipped_locations))
+            self.assertTrue(any(".venv" in item for item in plan.skipped_locations))
 
     def test_multiple_sources_collect_into_one_output_plan(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -278,6 +281,14 @@ class ScannerTests(unittest.TestCase):
             self.assertEqual(plan.files, [])
             self.assertTrue(any(group.phrase == "lpo" for group in plan.discovery_groups))
 
+    def test_appdata_is_traversed_for_user_documents(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "drive"
+            (root / "Users" / "Person" / "AppData" / "Local").mkdir(parents=True)
+            (root / "Users" / "Person" / "AppData" / "Local" / "Statement.pdf").write_bytes(b"appdata user document")
+            plan = scan_directory(root, Path(temp) / "output", ["Documents"], read_contents=False)
+            self.assertEqual([item.source.name for item in plan.files], ["Statement.pdf"])
+
     def test_safe_deep_scan_skips_operating_system_and_application_directories(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "drive"
@@ -296,8 +307,8 @@ class ScannerTests(unittest.TestCase):
             (root / "Boot" / "BCD.ini").write_bytes(b"boot")
             (root / "EFI" / "Microsoft" / "Boot" / "boot.ini").write_bytes(b"efi")
             plan = scan_directory(root, Path(temp) / "output", ["Documents"], read_contents=False)
-            self.assertEqual({item.source.name for item in plan.files}, {"LPO_2024.pdf"})
-            self.assertEqual(len(plan.discovery_candidates), 1)
+            self.assertEqual({item.source.name for item in plan.files}, {"LPO_2024.pdf", "LPO_cache.pdf"})
+            self.assertEqual(len(plan.discovery_candidates), 2)
 
 
     def test_cancelled_scan_returns_partial_plan_without_applying_files(self):

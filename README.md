@@ -1,4 +1,4 @@
-# Smart Drive Organizer — v0.7.0
+# Smart Drive Organizer — v0.8.0
 
 **Branded intelligent file search, safe discovery and reviewable organization**
 
@@ -6,7 +6,7 @@ A local-first Windows file organizer with a redesigned desktop workspace, custom
 
 **Brand system:** red `#D71920`, black `#101010`, and white `#FFFFFF`. The supplied split red/black face-and-skull mark, matching Windows executable icon and supplied light/dark feature icons are bundled with the application. The saved themes are Light, Dark and Redline.
 
-## v0.7.0 — Branded workspace, progress control and safer duplicate review
+## v0.8.0 — More exhaustive scans, explicit coverage reporting and version integrity
 
 - Applied the supplied master logo and light/dark feature icon atlas; added persistent Light, Dark and Redline themes across the main workspace and secondary dialogs.
 - Added a logo-centered circular progress indicator. During scans it reports completed-drive percentage, files found versus examined, match rate, active search terms and matching topic groups.
@@ -51,7 +51,7 @@ The installer fetches the latest GitHub Release, verifies its SHA-256 manifest, 
 
 ## Safe deep search and automatic discovery (v0.5.0)
 
-- The first scan searches recursively through the selected local fixed/removable drives and mounted volumes. The default selection now includes all supported file families and file extensions; network drives remain opt-in.
+- Scan every selected drive or folder recursively, including user AppData and documents inside software project folders. Network drives remain visible but require explicit selection.\n- Protected Windows/system/dependency folders, temporary files, links/reparse points and inaccessible entries remain excluded from organization for safety; every known excluded or inaccessible location is recorded in the scan report. A scan with exclusions or access warnings is never reported as fully complete.\n- The application version shown in the desktop sidebar comes from the installed build metadata. Operation journals record the actual running application version.
 - The search is read-only. It records accessible file names, paths, categories and file metadata. It never moves, copies, renames or deletes anything during discovery.
 - The discovery engine identifies repeated filename words and phrases across **at least two different files**. Discovery currently analyses filename wording; it does not yet build a full-text index of every document. Repeated words inside one file do not count as multiple matches.
 - Existing built-in and saved keywords are not suggested again as new discoveries. Candidate groups are separated by file family and include a match count, sample names and original locations.

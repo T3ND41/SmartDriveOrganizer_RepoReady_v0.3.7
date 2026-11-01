@@ -44,6 +44,12 @@ class ScanPlan:
     keyword_counts: Dict[str, int] = field(default_factory=dict)
     drives_completed: int = 0
     cancelled: bool = False
+    skipped_locations: List[str] = field(default_factory=list)
+    inaccessible_locations: List[str] = field(default_factory=list)
+
+    @property
+    def coverage_complete(self) -> bool:
+        return not self.cancelled and not self.warnings and not self.skipped_locations and not self.inaccessible_locations
 
     def __post_init__(self) -> None:
         if not self.source_roots:

@@ -359,7 +359,7 @@ class OrganizerApp(tk.Tk):
         ttk.Radiobutton(action, text="Copy files — safest first run", variable=self.mode_var, value="copy", style="Card.TRadiobutton").pack(anchor="w", pady=5)
         ttk.Radiobutton(action, text="Move files", variable=self.mode_var, value="move", style="Card.TRadiobutton").pack(anchor="w", pady=5)
         ttk.Separator(action).pack(fill="x", pady=8)
-        ttk.Checkbutton(action, text="Include subfolders", variable=self.recursive_var, style="Card.TCheckbutton").pack(anchor="w", pady=4)
+        ttk.Checkbutton(action, text="Scan every subfolder (required)", variable=self.recursive_var, state="disabled", style="Card.TCheckbutton").pack(anchor="w", pady=4)
         ttk.Checkbutton(action, text="Read document text where possible", variable=self.content_var, style="Card.TCheckbutton").pack(anchor="w", pady=4)
         ttk.Button(action, text="Add keyword rule…", style="Secondary.TButton", command=self._add_rule).pack(anchor="w", pady=(9, 0))
 
@@ -917,6 +917,7 @@ class OrganizerApp(tk.Tk):
             f"Preview: {len(plan.files):,} file(s), {size_gb:.2f} GB total; "
             f"{plan.scanned_count:,} files checked across {len(plan.source_roots):,} source(s); "
             f"{plan.skipped_count:,} skipped; {len(plan.discovery_groups):,} new recurring patterns found. "
+            f"Coverage: {'COMPLETE' if plan.coverage_complete else 'INCOMPLETE — review exclusions/warnings'}. "
             + (f"Showing first {MAX_PREVIEW_ROWS:,} rows." if extra else "")
         )
         self.apply_button.configure(state="normal" if plan.files and not plan.cancelled else "disabled")
@@ -995,7 +996,7 @@ class OrganizerApp(tk.Tk):
         )
         self._start_job("scan", lambda progress, control: scan_directories(
             sources, output, selected,
-            recursive=self.recursive_var.get(),
+            recursive=True,
             read_contents=self.content_var.get(),
             custom_rules=rules,
             progress=progress,
