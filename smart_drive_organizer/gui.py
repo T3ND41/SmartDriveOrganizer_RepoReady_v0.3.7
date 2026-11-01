@@ -917,6 +917,7 @@ class OrganizerApp(tk.Tk):
             f"Preview: {len(plan.files):,} file(s), {size_gb:.2f} GB total; "
             f"{plan.scanned_count:,} files checked across {len(plan.source_roots):,} source(s); "
             f"{plan.skipped_count:,} skipped; {len(plan.discovery_groups):,} new recurring patterns found. "
+            f"Coverage: {'COMPLETE' if plan.coverage_complete else 'INCOMPLETE — review exclusions/warnings'}. "
             + (f"Showing first {MAX_PREVIEW_ROWS:,} rows." if extra else "")
         )
         self.apply_button.configure(state="normal" if plan.files and not plan.cancelled else "disabled")
