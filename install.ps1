@@ -48,7 +48,14 @@ try {
         throw 'GitHub did not return a published release with downloadable assets. The project owner must publish a v* release first.'
     }
 
-    if ([string]$release.tag_name -notmatch '^v\d+\.\d+\.\d+
+    $releaseTag = [string]$release.tag_name
+    if ($releaseTag -notmatch '^v[0-9]+[.][0-9]+[.][0-9]+$') {
+        throw "GitHub returned an invalid stable release tag: $releaseTag"
+    }
+
+    Write-InstallerMessage "Latest published stable release: $releaseTag" -Color Green
+    $zipAsset = $release.assets | Where-Object { $_.name -eq $ExpectedZipName } | Select-Object -First 1
+    $checksumAsset = $release.assets | Where-Object { $_.name -eq $ExpectedChecksumName } | Select-Object -First 1
     if (-not $zipAsset -or -not $checksumAsset) {
         throw "Release $($release.tag_name) is missing $ExpectedZipName or $ExpectedChecksumName. Please report this release packaging issue."
     }
