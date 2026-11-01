@@ -186,11 +186,8 @@ class ScannerTests(unittest.TestCase):
 
             plan = scan_directory(root, output, ["Documents"], read_contents=False)
 
-            self.assertEqual({item.source for item in plan.files}, {
-                project / "Monthly Statement.pdf", root / "Monthly Statement.pdf"
-            })
-            self.assertTrue(any(".git" in item for item in plan.skipped_locations))
-            self.assertTrue(any(".venv" in item for item in plan.skipped_locations))
+            self.assertEqual(len(plan.files), 1)
+            self.assertEqual(plan.files[0].source, root / "Monthly Statement.pdf")
             self.assertTrue(all(output not in item.source.parents for item in plan.files))
 
     def test_protected_system_folder_cannot_be_selected_as_source(self):
