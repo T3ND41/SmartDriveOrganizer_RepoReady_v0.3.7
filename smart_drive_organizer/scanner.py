@@ -17,7 +17,7 @@ PROTECTED_DIRECTORY_NAMES = {
     "$recycle.bin", "recycler", "system volume information", "windows", "windowsapps", "program files",
     "program files (x86)", "programdata", "recovery", "perflogs", "$winreagent", "boot", "efi",
     "$windows.~bt", "$windows.~ws", "config.msi", "msocache", "system restore",
-    "documents and settings", "appdata", "proc", "sys", "dev", "run", "lost+found",
+    "documents and settings", "proc", "sys", "dev", "run", "lost+found",
     ".git", ".hg", ".svn", "node_modules", ".venv", "venv", ".cache", ".npm", ".pnpm-store",
     ".yarn", ".gradle", ".m2", ".cargo", ".rustup", ".nuget", ".pytest_cache", ".mypy_cache",
     ".tox", ".nox", "__pycache__",
@@ -120,13 +120,6 @@ def scan_directory(
         raise ValueError("The source location does not exist or is not a folder.")
     if source.name.casefold() in PROTECTED_DIRECTORY_NAMES:
         raise ValueError("This is a protected system/dependency folder. Choose a normal working folder or drive root instead.")
-    try:
-        root_names = [item.name for item in source.iterdir() if item.is_dir()]
-        root_files = [item.name for item in source.iterdir() if item.is_file()]
-        if (source / ".git").exists() or _is_project_root(source, root_names, root_files):
-            raise ValueError("The selected source appears to be a software project root. Choose a folder outside the project so relative paths are not broken.")
-    except PermissionError:
-        raise ValueError("Windows denied access to the selected source folder. Choose a folder you can read.")
     if not selected:
         raise ValueError("Select at least one file category.")
     if _unsafe_output_overlap(source, output):
@@ -169,7 +162,9 @@ def scan_directory(
         })
 
     def on_walk_error(error: OSError) -> None:
-        plan.warnings.append(f"Could not access folder: {error}")
+        location = str(getattr(error, "filename", "") or "<unknown folder>")
+        plan.inaccessible_locations.append(location)
+        plan.warnings.append(f"Could not access folder {location}: {error}")
 
     for current, dirs, filenames in os.walk(source, topdown=True, followlinks=False, onerror=on_walk_error):
         if control is not None:
@@ -205,18 +200,16 @@ def scan_directory(
             if child_resolved == output or any(child_resolved == route or route in child_resolved.parents for route in route_destinations):
                 plan.skipped_count += 1
                 continue
-            if dirname.casefold() in PROTECTED_DIRECTORY_NAMES or _is_reparse_or_link(child):
+            if dirname.casefold() in PROTECTED_DIRECTORY_NAMES:
                 plan.skipped_count += 1
+                plan.skipped_locations.append(f"{child} [protected system/dependency directory]")
+                continue
+            if _is_reparse_or_link(child):
+                plan.skipped_count += 1
+                plan.skipped_locations.append(f"{child} [link, reparse point, cloud placeholder, or inaccessible entry]")
                 continue
             safe_dirs.append(dirname)
         dirs[:] = safe_dirs if recursive else []
-
-        # Avoid moving files from software projects where relative paths matter.
-        if current_path != source and (has_git_directory or _is_project_root(current_path, dirs, filenames)):
-            dirs[:] = []
-            plan.skipped_count += len(filenames)
-            plan.warnings.append(f"Skipped likely project directory to protect its internal structure: {current_path}")
-            continue
 
         for filename in filenames:
             if control is not None:
@@ -232,9 +225,11 @@ def scan_directory(
                 progress_snapshot()
             if filename.casefold() in PROTECTED_FILE_NAMES or path.suffix.casefold() in PROTECTED_FILE_EXTENSIONS:
                 plan.skipped_count += 1
+                plan.skipped_locations.append(f"{path} [protected or temporary file]")
                 continue
             if _is_reparse_or_link(path):
                 plan.skipped_count += 1
+                plan.skipped_locations.append(f"{path} [link, reparse point, cloud placeholder, or inaccessible entry]")
                 continue
             try:
                 if not path.is_file():
@@ -287,6 +282,7 @@ def scan_directory(
                 plan.keyword_counts[topic] = plan.keyword_counts.get(topic, 0) + 1
             except OSError as error:
                 plan.skipped_count += 1
+                plan.inaccessible_locations.append(str(path))
                 plan.warnings.append(f"Could not inspect {path}: {error}")
 
         if plan.cancelled or not recursive:
@@ -418,6 +414,8 @@ def scan_directories(
             combined.files.extend(part.files)
             combined.discovery_candidates.extend(part.discovery_candidates)
             combined.warnings.extend(part.warnings)
+            combined.skipped_locations.extend(part.skipped_locations)
+            combined.inaccessible_locations.extend(part.inaccessible_locations)
             combined.skipped_count += part.skipped_count
             combined.scanned_count += part.scanned_count
             for keyword, count in part.keyword_counts.items():
